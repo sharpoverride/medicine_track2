@@ -1,0 +1,274 @@
+@MyWebApi_HostAddress = https://localhost:7001
+@ContentType_Json = application/json
+
+# Variables for path parameters (replace with actual IDs)
+@userId = {{$guid}}
+@medicationId = {{$guid}}
+@logId = {{$guid}}
+@startDate = {{$datetime "YYYY-MM-DD"}}
+
+
+
+###
+### Medication Database Endpoints
+###
+
+### Search Medication Database
+# @name SearchMedicationDatabase
+# Description: Searches the medication database.
+# Parameters:
+# - query (string, required): The search query.
+# - form (string, optional): Filter by medication form.
+# - strength (string, optional): Filter by medication strength.
+GET {{MyWebApi_HostAddress}}/medication-database/search?query=aspirin&form=tablet&strength=100mg
+Accept: {{ContentType_Json}}
+
+###
+### Medication Interactions Endpoints
+###
+
+### Check Medication Interactions
+# @name CheckMedicationInteractions
+# Description: Checks for potential interactions between medications for a user.
+# Path Parameters:
+# - userId (uuid, required): The ID of the user.
+POST {{MyWebApi_HostAddress}}/users/{{userId}}/medication-interactions/check
+Content-Type: {{ContentType_Json}}
+Accept: {{ContentType_Json}}
+
+{
+  "medicationIds": [
+    "{{$guid}}"
+  ],
+  "newMedication": {
+    "ndcCode": "string",
+    "name": "NewMed",
+    "genericName": "GenericNewMed",
+    "brandNames": [
+      "BrandNewMed"
+    ],
+    "availableForms": [
+      "tablet"
+    ],
+    "availableStrengths": [
+      "100mg"
+    ],
+    "manufacturer": "Pharma Inc."
+  },
+  "existingMedicationIds": [
+    "{{$guid}}"
+  ]
+}
+
+###
+### Medications Endpoints
+###
+
+### Create a new medication for a user
+# @name CreateUserMedication
+# Description: Adds a new medication to a user's list.
+# Path Parameters:
+# - userId (uuid, required): The ID of the user.
+POST {{MyWebApi_HostAddress}}/users/{{userId}}/medications
+Content-Type: {{ContentType_Json}}
+Accept: {{ContentType_Json}}
+
+{
+  "name": "Lisinopril",
+  "genericName": "Lisinopril",
+  "brandName": "Zestril",
+  "strength": "10mg",
+  "form": "Tablet",
+  "shape": "Round",
+  "color": "Pink",
+  "notes": "Take one tablet daily in the morning.",
+  "startDate": "{{startDate}}",
+  "endDate": null,
+  "schedules": [
+    {
+      "frequencyType": "Daily",
+      "interval": 1,
+      "daysOfWeek": [], 
+      "timesOfDay": [
+        "08:00:00"
+      ],
+      "quantity": 1.0,
+      "unit": "tablet"
+    }
+  ]
+}
+
+### Get all medications for a user
+# @name GetUserMedications
+# Description: Retrieves all medications for a specific user.
+# Path Parameters:
+# - userId (uuid, required): The ID of the user.
+# Query Parameters:
+# - status (string, optional): Filter by medication status (e.g., active, archived).
+# - search (string, optional): Search term for medications.
+GET {{MyWebApi_HostAddress}}/users/{{userId}}/medications?status=active&search=Lisinopril
+Accept: {{ContentType_Json}}
+
+### Get a specific medication for a user by ID
+# @name GetUserMedicationById
+# Description: Retrieves a specific medication by its ID for a user.
+# Path Parameters:
+# - userId (uuid, required): The ID of the user.
+# - medicationId (uuid, required): The ID of the medication.
+# After creating a medication, you can set the medicationId like this:
+# @medicationId = {{CreateUserMedication.response.body.$.id}}
+GET {{MyWebApi_HostAddress}}/users/{{userId}}/medications/{{medicationId}}
+Accept: {{ContentType_Json}}
+
+### Update an existing medication for a user
+# @name UpdateUserMedication
+# Description: Updates an existing medication for a user.
+# Path Parameters:
+# - userId (uuid, required): The ID of the user.
+# - medicationId (uuid, required): The ID of the medication to update.
+PUT {{MyWebApi_HostAddress}}/users/{{userId}}/medications/{{medicationId}}
+Content-Type: {{ContentType_Json}}
+Accept: {{ContentType_Json}}
+
+{
+  "name": "Lisinopril Updated",
+  "genericName": "Lisinopril",
+  "brandName": "Zestril",
+  "strength": "20mg", // Updated strength
+  "form": "Tablet",
+  "shape": "Oval", // Updated shape
+  "color": "White", // Updated color
+  "notes": "Take one tablet daily in the morning with food.", // Updated notes
+  "startDate": "{{$date 'yyyy-MM-dd'}}",
+  "endDate": null,
+  "isArchived": false,
+  "schedules": [
+    {
+      "frequencyType": "Daily",
+      "interval": 1,
+      "daysOfWeek": [],
+      "timesOfDay": [
+        "08:30:00" // Updated time
+      ],
+      "quantity": 1.0,
+      "unit": "tablet"
+    }
+  ]
+}
+
+### Delete a medication for a user
+# @name DeleteUserMedication
+# Description: Deletes a medication for a user.
+# Path Parameters:
+# - userId (uuid, required): The ID of the user.
+# - medicationId (uuid, required): The ID of the medication to delete.
+DELETE {{MyWebApi_HostAddress}}/users/{{userId}}/medications/{{medicationId}}
+Accept: {{ContentType_Json}}
+
+###
+### Medication Logs Endpoints
+###
+
+### Log a medication dose
+# @name LogMedicationDose
+# Description: Logs a dose of medication taken by a user.
+# Path Parameters:
+# - userId (uuid, required): The ID of the user.
+# - medicationId (uuid, required): The ID of the medication.
+POST {{MyWebApi_HostAddress}}/users/{{userId}}/medications/{{medicationId}}/logs
+Content-Type: {{ContentType_Json}}
+Accept: {{ContentType_Json}}
+
+{
+  "takenAt": "{{$datetime iso8601}}",
+  "status": "Taken", // Example: Taken, Skipped, Missed
+  "scheduleId": "{{$guid}}", // Optional: ID of the schedule this log corresponds to
+  "quantityTaken": 1.0,
+  "notes": "Took with a full glass of water."
+}
+
+### Get medication logs for a specific medication of a user
+# @name GetUserMedicationLogs
+# Description: Retrieves logs for a specific medication of a user.
+# Path Parameters:
+# - userId (uuid, required): The ID of the user.
+# - medicationId (uuid, required): The ID of the medication.
+# Query Parameters:
+# - startDate (date-time, optional): Filter logs from this date.
+# - endDate (date-time, optional): Filter logs up to this date.
+# - status (integer, optional): Filter by log status.
+# After logging a dose, you can set the logId like this:
+# @logId = {{LogMedicationDose.response.body.$.id}}
+GET {{MyWebApi_HostAddress}}/users/{{userId}}/medications/{{medicationId}}/logs?startDate={{$datetime iso8601 offset='-7d'}}&endDate={{$datetime iso8601}}
+Accept: {{ContentType_Json}}
+
+### Get all medication logs for a user
+# @name GetAllUserMedicationLogs
+# Description: Retrieves all medication logs for a user, optionally filtered.
+# Path Parameters:
+# - userId (uuid, required): The ID of the user.
+# Query Parameters:
+# - medicationId (uuid, optional): Filter by a specific medication ID.
+# - startDate (date-time, optional): Filter logs from this date.
+# - endDate (date-time, optional): Filter logs up to this date.
+# - status (integer, optional): Filter by log status.
+GET {{MyWebApi_HostAddress}}/users/{{userId}}/medication-logs?startDate={{$datetime iso8601 offset='-30d'}}
+Accept: {{ContentType_Json}}
+
+### Update a medication log for a user
+# @name UpdateUserMedicationLog
+# Description: Updates an existing medication log.
+# Path Parameters:
+# - userId (uuid, required): The ID of the user.
+# - logId (uuid, required): The ID of the medication log to update.
+PUT {{MyWebApi_HostAddress}}/users/{{userId}}/medication-logs/{{logId}}
+Content-Type: {{ContentType_Json}}
+Accept: {{ContentType_Json}}
+
+{
+  "takenAt": "{{$datetime iso8601}}",
+  "status": "Skipped", // Example: Updated to Skipped
+  "quantityTaken": 0.0,
+  "notes": "Decided to skip this dose as per doctor's advice."
+}
+
+### Delete a medication log for a user
+# @name DeleteUserMedicationLog
+# Description: Deletes a medication log.
+# Path Parameters:
+# - userId (uuid, required): The ID of the user.
+# - logId (uuid, required): The ID of the medication log to delete.
+DELETE {{MyWebApi_HostAddress}}/users/{{userId}}/medication-logs/{{logId}}
+Accept: {{ContentType_Json}}
+
+###
+### Negative Tests / Edge Cases (Examples)
+###
+
+### Attempt to get a non-existent medication
+# @name GetNonExistentMedication
+GET {{MyWebApi_HostAddress}}/users/{{userId}}/medications/{{$guid}} # Use a random non-existent ID
+Accept: {{ContentType_Json}}
+
+### Create medication with invalid data (e.g., missing required field 'name')
+# @name CreateMedicationInvalidData
+POST {{MyWebApi_HostAddress}}/users/{{userId}}/medications
+Content-Type: {{ContentType_Json}}
+Accept: {{ContentType_Json}}
+
+{
+  // "name": "Missing Name Medication", // 'name' is required by CreateMedicationRequest
+  "genericName": "Generic",
+  "brandName": "Brand",
+  "strength": "5mg",
+  "form": "Capsule",
+  "startDate": "{{$date 'yyyy-MM-dd'}}",
+  "schedules": [
+    {
+      "frequencyType": "Daily",
+      "timesOfDay": ["09:00:00"],
+      "quantity": 1.0,
+      "unit": "capsule"
+    }
+  ]
+}

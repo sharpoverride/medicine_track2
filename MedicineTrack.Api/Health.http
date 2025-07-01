@@ -1,0 +1,8 @@
+@MyWebApi_HostAddress = https://localhost:7001
+@ContentType_Json = application/json
+
+###
+### Medication Database Endpoints
+###
+
+GET {{MyWebApi_HostAddress}}/health
