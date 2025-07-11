@@ -1,0 +1,6 @@
+@MedicineTrack_Configuration_HostAddress = http://localhost:5111
+
+GET {{MedicineTrack_Configuration_HostAddress}}/health/
+Accept: application/json
+
+###

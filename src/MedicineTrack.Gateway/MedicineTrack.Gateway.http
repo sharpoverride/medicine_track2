@@ -1,0 +1,15 @@
+@MedicineTrack_Gateway_HostAddress = http://localhost:5238
+
+GET {{MedicineTrack_Gateway_HostAddress}}/configs/health
+Accept: application/json
+
+###
+
+GET {{MedicineTrack_Gateway_HostAddress}}/medicines/health
+Accept: application/json
+
+####
+
+GET {{MedicineTrack_Gateway_HostAddress}}/health
+Accept: application/json
+

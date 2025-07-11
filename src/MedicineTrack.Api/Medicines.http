@@ -1,4 +1,5 @@
-@MyWebApi_HostAddress = https://localhost:7001
+# @MyWebApi_HostAddress = https://localhost:7001
+@MyWebApi_HostAddress = http://localhost:5238
 @ContentType_Json = application/json
 
 # Variables for path parameters (replace with actual IDs)
@@ -134,12 +135,12 @@ Accept: {{ContentType_Json}}
   "name": "Lisinopril Updated",
   "genericName": "Lisinopril",
   "brandName": "Zestril",
-  "strength": "20mg", // Updated strength
+  "strength": "20mg",
   "form": "Tablet",
-  "shape": "Oval", // Updated shape
-  "color": "White", // Updated color
-  "notes": "Take one tablet daily in the morning with food.", // Updated notes
-  "startDate": "{{$date 'yyyy-MM-dd'}}",
+  "shape": "Oval",
+  "color": "White",
+  "notes": "Take one tablet daily in the morning with food.",
+  "startDate": "{{startDate}}",
   "endDate": null,
   "isArchived": false,
   "schedules": [
@@ -148,7 +149,7 @@ Accept: {{ContentType_Json}}
       "interval": 1,
       "daysOfWeek": [],
       "timesOfDay": [
-        "08:30:00" // Updated time
+        "08:30:00"
       ],
       "quantity": 1.0,
       "unit": "tablet"
@@ -181,8 +182,8 @@ Accept: {{ContentType_Json}}
 
 {
   "takenAt": "{{$datetime iso8601}}",
-  "status": "Taken", // Example: Taken, Skipped, Missed
-  "scheduleId": "{{$guid}}", // Optional: ID of the schedule this log corresponds to
+  "status": "Taken",
+  "scheduleId": "{{$guid}}",
   "quantityTaken": 1.0,
   "notes": "Took with a full glass of water."
 }
@@ -227,7 +228,7 @@ Accept: {{ContentType_Json}}
 
 {
   "takenAt": "{{$datetime iso8601}}",
-  "status": "Skipped", // Example: Updated to Skipped
+  "status": "Skipped",
   "quantityTaken": 0.0,
   "notes": "Decided to skip this dose as per doctor's advice."
 }
@@ -257,12 +258,11 @@ Content-Type: {{ContentType_Json}}
 Accept: {{ContentType_Json}}
 
 {
-  // "name": "Missing Name Medication", // 'name' is required by CreateMedicationRequest
   "genericName": "Generic",
   "brandName": "Brand",
   "strength": "5mg",
   "form": "Capsule",
-  "startDate": "{{$date 'yyyy-MM-dd'}}",
+  "startDate": "{{startDate}}",
   "schedules": [
     {
       "frequencyType": "Daily",

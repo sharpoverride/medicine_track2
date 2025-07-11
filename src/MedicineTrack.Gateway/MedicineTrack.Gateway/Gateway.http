@@ -1,0 +1,105 @@
+# Gateway API Test File
+@GatewayHost = http://localhost:5000
+@ContentType_Json = application/json
+
+# Variables
+@organizationId = {{$guid}}
+@userId = {{$guid}}
+
+###
+### Health Checks
+###
+
+### Gateway Health Check
+GET {{GatewayHost}}/health
+Accept: {{ContentType_Json}}
+
+### MedicineTrack API Health Check (via Gateway)
+GET {{GatewayHost}}/api/medicineTrack/health
+Accept: {{ContentType_Json}}
+
+### Configuration API Health Check (via Gateway)
+GET {{GatewayHost}}/api/config/health
+Accept: {{ContentType_Json}}
+
+###
+### Organization Management (via Gateway)
+###
+
+### Create Organization
+POST {{GatewayHost}}/api/config/organizations
+Content-Type: {{ContentType_Json}}
+Accept: {{ContentType_Json}}
+
+{
+  "name": "Healthcare Solutions Inc.",
+  "description": "Leading healthcare technology provider",
+  "contactEmail": "contact@healthcaresolutions.com",
+  "address": "123 Medical Plaza, Health City, HC 12345",
+  "phoneNumber": "+1-555-0199"
+}
+
+### Get All Organizations
+GET {{GatewayHost}}/api/config/organizations
+Accept: {{ContentType_Json}}
+
+### Get Organization by ID
+GET {{GatewayHost}}/api/config/organizations/{{organizationId}}
+Accept: {{ContentType_Json}}
+
+###
+### User Management (via Gateway)
+###
+
+### Create User
+POST {{GatewayHost}}/api/config/organizations/{{organizationId}}/users
+Content-Type: {{ContentType_Json}}
+Accept: {{ContentType_Json}}
+
+{
+  "email": "admin@healthcaresolutions.com",
+  "name": "Admin User",
+  "role": "ADMIN",
+  "phoneNumber": "+1-555-0123",
+  "timezone": "America/New_York"
+}
+
+### Get Organization Users
+GET {{GatewayHost}}/api/config/organizations/{{organizationId}}/users
+Accept: {{ContentType_Json}}
+
+###
+### Medicine Track API (via Gateway)
+###
+
+### Get User Medications (via Gateway)
+GET {{GatewayHost}}/api/medicineTrack/users/{{userId}}/medications
+Accept: {{ContentType_Json}}
+
+### Create Medication (via Gateway)
+POST {{GatewayHost}}/api/medicineTrack/users/{{userId}}/medications
+Content-Type: {{ContentType_Json}}
+Accept: {{ContentType_Json}}
+
+{
+  "name": "Aspirin",
+  "genericName": "Acetylsalicylic acid",
+  "brandName": "Bayer",
+  "strength": "81mg",
+  "form": "Tablet",
+  "shape": "Round",
+  "color": "White",
+  "notes": "Take with food",
+  "startDate": "2024-01-01",
+  "endDate": null,
+  "schedules": [
+    {
+      "frequencyType": "DAILY",
+      "interval": 1,
+      "daysOfWeek": [],
+      "timesOfDay": ["08:00:00"],
+      "quantity": 1.0,
+      "unit": "tablet"
+    }
+  ]
+}

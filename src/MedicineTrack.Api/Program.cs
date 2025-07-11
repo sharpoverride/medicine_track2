@@ -218,7 +218,7 @@ app.MapPost($"{baseApiRoute}/users/{{userId:guid}}/medication-interactions/check
 .Produces<List<MedicationInteractionWarning>>()
 .Produces(StatusCodes.Status400BadRequest);
 
-app.MapGet("health", () => "OK");
+app.MapGet("health", () => "MedicineTrack API is OK");
 
 app.Run();
 

@@ -6,9 +6,9 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/MedicineTrack.Api/bin/Debug/net9.0/MedicineTrack.Api.dll",
+            "program": "${workspaceFolder}/src/MedicineTrack.Api/bin/Debug/net9.0/MedicineTrack.Api.dll",
             "args": [],
-            "cwd": "${workspaceFolder}/MedicineTrack.Api",
+            "cwd": "${workspaceFolder}/src/MedicineTrack.Api",
             "stopAtEntry": false,
             "serverReadyAction": {
                 "action": "openExternally",
@@ -19,6 +19,19 @@
             },
             "sourceFileMap": {
                 "/Views": "${workspaceFolder}/Views"
+            }
+        },
+        {
+            "name": ".NET Aspire AppHost",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build-apphost",
+            "program": "${workspaceFolder}/src/MedicineTrack.AppHost/bin/Debug/net9.0/MedicineTrack.AppHost.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/MedicineTrack.AppHost",
+            "stopAtEntry": false,
+            "env": {
+                "ASPNETCORE_ENVIRONMENT": "Development"
             }
         }
     ]
