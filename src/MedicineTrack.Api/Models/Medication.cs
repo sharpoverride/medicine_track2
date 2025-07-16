@@ -1,20 +1,21 @@
 namespace MedicineTrack.Api.Models;
 
-public record Medication(
-    Guid Id,
-    Guid UserId,
-    string Name,
-    string? GenericName,
-    string? BrandName,
-    string Strength,
-    string Form,
-    string? Shape,
-    string? Color,
-    string? Notes,
-    DateOnly StartDate,
-    DateOnly? EndDate,
-    bool IsArchived,
-    List<Schedule> Schedules,
-    DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt
-);
+public class Medication
+{
+    public Guid Id { get; set; }
+    public Guid UserId { get; set; }
+    public string Name { get; set; } = null!;
+    public string? GenericName { get; set; }
+    public string? BrandName { get; set; }
+    public string Strength { get; set; } = null!;
+    public string Form { get; set; } = null!;
+    public string? Shape { get; set; }
+    public string? Color { get; set; }
+    public string? Notes { get; set; }
+    public DateOnly StartDate { get; set; }
+    public DateOnly? EndDate { get; set; }
+    public bool IsArchived { get; set; }
+    public List<Schedule> Schedules { get; set; } = new();
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+}

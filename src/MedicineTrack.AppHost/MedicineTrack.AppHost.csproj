@@ -17,8 +17,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MedicineTrack.Api\MedicineTrack.Api.csproj" />
+    <ProjectReference Include="..\MedicineTrack.Configuration.Migrations\MedicineTrack.Configuration.Migrations.csproj" />
     <ProjectReference Include="..\MedicineTrack.Gateway\MedicineTrack.Gateway.csproj" />
     <ProjectReference Include="..\MedicineTrack.Configuration\MedicineTrack.Configuration.csproj" />
+    <ProjectReference Include="..\MedicineTrack.Medication.Migrations\MedicineTrack.Medication.Migrations.csproj" />
   </ItemGroup>
 
 </Project>

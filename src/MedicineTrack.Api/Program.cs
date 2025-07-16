@@ -45,11 +45,25 @@ medicationsGroup.MapPost("/", (Guid userId, [FromBody] CreateMedicationRequest r
         Guid.NewGuid(), s.FrequencyType, s.Interval, s.DaysOfWeek, s.TimesOfDay, s.Quantity, s.Unit
     )).ToList();
 
-    var newMedication = new Medication(
-        Guid.NewGuid(), userId, req.Name, req.GenericName, req.BrandName, req.Strength, req.Form,
-        req.Shape, req.Color, req.Notes, req.StartDate, req.EndDate, false, newSchedules,
-        DateTimeOffset.UtcNow, DateTimeOffset.UtcNow
-    );
+    var newMedication = new Medication
+    {
+        Id = Guid.NewGuid(),
+        UserId = userId,
+        Name = req.Name,
+        GenericName = req.GenericName,
+        BrandName = req.BrandName,
+        Strength = req.Strength,
+        Form = req.Form,
+        Shape = req.Shape,
+        Color = req.Color,
+        Notes = req.Notes,
+        StartDate = req.StartDate,
+        EndDate = req.EndDate,
+        IsArchived = false,
+        Schedules = newSchedules,
+        CreatedAt = DateTimeOffset.UtcNow,
+        UpdatedAt = DateTimeOffset.UtcNow
+    };
     return Results.Created($"{baseApiRoute}/users/{userId}/medications/{newMedication.Id}", newMedication);
 })
 .Produces<Medication>(StatusCodes.Status201Created)
@@ -61,9 +75,25 @@ medicationsGroup.MapGet("/", (Guid userId, string? status, string? search) =>
     var sampleSchedule = new Schedule(Guid.NewGuid(), FrequencyType.EVERY_X_DAYS, 1, null, new List<TimeOnly> { new TimeOnly(8,0) }, 1, "tablet");
     var sampleMedications = new List<Medication>
     {
-        new Medication(Guid.NewGuid(), userId, "Lisinopril", "Lisinopril", "Zestril", "10 mg", "Tablet",
-                       "Round", "White", "Take with water", DateOnly.FromDateTime(DateTime.UtcNow), null, false,
-                       new List<Schedule> { sampleSchedule }, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow)
+        new Medication
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Name = "Lisinopril",
+            GenericName = "Lisinopril",
+            BrandName = "Zestril",
+            Strength = "10 mg",
+            Form = "Tablet",
+            Shape = "Round",
+            Color = "White",
+            Notes = "Take with water",
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            EndDate = null,
+            IsArchived = false,
+            Schedules = new List<Schedule> { sampleSchedule },
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        }
     };
     return Results.Ok(sampleMedications);
 })
@@ -73,9 +103,25 @@ medicationsGroup.MapGet("/{medicationId:guid}", (Guid userId, Guid medicationId)
 {
     // Placeholder: Retrieve from DB
     var sampleSchedule = new Schedule(Guid.NewGuid(), FrequencyType.EVERY_X_DAYS, 1, null, new List<TimeOnly> { new TimeOnly(8,0) }, 1, "tablet");
-    var medication = new Medication(medicationId, userId, "Lisinopril", "Lisinopril", "Zestril", "10 mg", "Tablet",
-                                  "Round", "White", "Take with water", DateOnly.FromDateTime(DateTime.UtcNow), null, false,
-                                  new List<Schedule> { sampleSchedule }, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+    var medication = new Medication
+    {
+        Id = medicationId,
+        UserId = userId,
+        Name = "Lisinopril",
+        GenericName = "Lisinopril",
+        BrandName = "Zestril",
+        Strength = "10 mg",
+        Form = "Tablet",
+        Shape = "Round",
+        Color = "White",
+        Notes = "Take with water",
+        StartDate = DateOnly.FromDateTime(DateTime.UtcNow),
+        EndDate = null,
+        IsArchived = false,
+        Schedules = new List<Schedule> { sampleSchedule },
+        CreatedAt = DateTimeOffset.UtcNow,
+        UpdatedAt = DateTimeOffset.UtcNow
+    };
     return Results.Ok(medication);
     // return Results.NotFound(); // If not found
 })
@@ -86,13 +132,25 @@ medicationsGroup.MapPut("/{medicationId:guid}", (Guid userId, Guid medicationId,
 {
     // Placeholder: Retrieve from DB, update, and save
     var sampleSchedule = new Schedule(Guid.NewGuid(), FrequencyType.EVERY_X_DAYS, 1, null, new List<TimeOnly> { new TimeOnly(8,0) }, 1, "tablet");
-    var updatedMedication = new Medication(
-        medicationId, userId, req.Name ?? "Existing Name", req.GenericName, req.BrandName, req.Strength ?? "10mg",
-        req.Form ?? "Tablet", req.Shape, req.Color, req.Notes, req.StartDate ?? DateOnly.FromDateTime(DateTime.UtcNow),
-        req.EndDate, req.IsArchived ?? false,
-        req.Schedules?.Select(s => new Schedule(Guid.NewGuid(), s.FrequencyType, s.Interval, s.DaysOfWeek, s.TimesOfDay, s.Quantity, s.Unit)).ToList() ?? new List<Schedule> { sampleSchedule },
-        DateTimeOffset.UtcNow.AddDays(-5), DateTimeOffset.UtcNow // Simulate existing created date
-    );
+    var updatedMedication = new Medication
+    {
+        Id = medicationId,
+        UserId = userId,
+        Name = req.Name ?? "Existing Name",
+        GenericName = req.GenericName,
+        BrandName = req.BrandName,
+        Strength = req.Strength ?? "10mg",
+        Form = req.Form ?? "Tablet",
+        Shape = req.Shape,
+        Color = req.Color,
+        Notes = req.Notes,
+        StartDate = req.StartDate ?? DateOnly.FromDateTime(DateTime.UtcNow),
+        EndDate = req.EndDate,
+        IsArchived = req.IsArchived ?? false,
+        Schedules = req.Schedules?.Select(s => new Schedule(Guid.NewGuid(), s.FrequencyType, s.Interval, s.DaysOfWeek, s.TimesOfDay, s.Quantity, s.Unit)).ToList() ?? new List<Schedule> { sampleSchedule },
+        CreatedAt = DateTimeOffset.UtcNow.AddDays(-5), // Simulate existing created date
+        UpdatedAt = DateTimeOffset.UtcNow
+    };
     return Results.Ok(updatedMedication);
     // return Results.NotFound(); // If not found
 })

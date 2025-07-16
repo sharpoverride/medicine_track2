@@ -18,15 +18,17 @@ var configurationMigrations = builder.AddProject<Projects.MedicineTrack_Configur
     .WithReference(configurationDb)
     .WithArgs("migrate");
 
-// Application services
+// Application services - wait for migrations to complete
 var apiService = builder.AddProject<Projects.MedicineTrack_Api>("medicine-track-api")
     .WithReference(valkeyCache)
     .WithReference(medicationDb)
+    .WaitFor(medicationMigrations)
     .WithHttpEndpoint(port: 5001, name: "api-http");
 
 var configService = builder.AddProject<Projects.MedicineTrack_Configuration>("medicine-track-config")
     .WithReference(valkeyCache)
     .WithReference(configurationDb)
+    .WaitFor(configurationMigrations)
     .WithHttpEndpoint(port: 5002, name: "config-http");
 
 // API Gateway - references the backend services
