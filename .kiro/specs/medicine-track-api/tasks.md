@@ -6,11 +6,13 @@
   - Set up logging configuration and structured logging
   - _Requirements: 6.1, 6.4, 7.1_
 
-- [ ] 2. Implement comprehensive data models and validation
-  - [ ] 2.1 Create domain model interfaces and base classes
-    - Define IEntity interface for common entity properties
+- [-] 2. Implement comprehensive data models and validation using the latest Entity Framework Core in it's own MedicationTrack.Medication.Data and MedicineTrack.Configuration.Data projects
+  - [x] 2.1 Create domain model interfaces and base classes
     - Create base audit fields (CreatedAt, UpdatedAt) for trackable entities
     - Implement value objects for complex types like dosage and schedule information
+    - Add additional console Migration projects for each MedicineTrack.Medication.Data and MedicineTrack.Configuration.Data projects where you add the Migrations
+    - Configure EntityFramework to use Npgsql 
+    - Modify the projects to use the Postgresql service from .net aspose MedicineTrack.AppHost project
     - _Requirements: 1.1, 2.1, 8.2_
 
   - [ ] 2.2 Implement User model with validation
