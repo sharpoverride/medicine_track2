@@ -1,22 +1,22 @@
 using Microsoft.AspNetCore.Mvc;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text.Json.Serialization;
+using MedicineTrack.Api.Configuration;
+using MedicineTrack.Api.Models;
+using MedicineTrack.Api.DTOs;
+using MedicineTrack.Api.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+
+// Configure MedicineTrack services and logging
+builder.Services.AddMedicineTrackServices();
+builder.Services.AddMedicineTrackLogging();
+
 // In a real application, you would add services for database context, authentication, etc.
 // builder.Services.AddDbContext<AppDbContext>(options => ...);
 // builder.Services.AddAuthentication(...);
 // builder.Services.AddAuthorization();
-builder.Services.ConfigureHttpJsonOptions(options =>
-{
-    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
-});
 
 var app = builder.Build();
 
@@ -221,131 +221,3 @@ app.MapPost($"{baseApiRoute}/users/{{userId:guid}}/medication-interactions/check
 app.MapGet("health", () => "MedicineTrack API is OK");
 
 app.Run();
-
-// --- Enums ---
-public enum FrequencyType { DAILY, WEEKLY, MONTHLY, AS_NEEDED, EVERY_X_DAYS, SPECIFIC_DAYS_OF_WEEK, EVERY_X_WEEKS, EVERY_X_MONTHS }
-public enum LogStatus { TAKEN, SKIPPED, LOGGED_AS_NEEDED }
-public enum InteractionSeverity { HIGH, MODERATE, LOW, UNKNOWN }
-
-// --- Data Contracts (Models/Records) ---
-public record User(Guid Id, string Email, string Name, string Timezone, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
-
-public record Schedule(
-    Guid Id,
-    FrequencyType FrequencyType,
-    int? Interval,
-    List<DayOfWeek>? DaysOfWeek,
-    List<TimeOnly> TimesOfDay,
-    double? Quantity,
-    string? Unit
-);
-
-public record Medication(
-    Guid Id,
-    Guid UserId,
-    string Name,
-    string? GenericName,
-    string? BrandName,
-    string Strength,
-    string Form,
-    string? Shape,
-    string? Color,
-    string? Notes,
-    DateOnly StartDate,
-    DateOnly? EndDate,
-    bool IsArchived,
-    List<Schedule> Schedules,
-    DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt
-);
-
-public record MedicationLog(
-    Guid Id,
-    Guid UserId,
-    Guid MedicationId,
-    Guid? ScheduleId,
-    DateTimeOffset TakenAt,
-    LogStatus Status,
-    double? QuantityTaken,
-    string? Notes,
-    DateTimeOffset LoggedAt
-);
-
-public record MedicationDefinition(
-    string? NdcCode,
-    string Name,
-    string? GenericName,
-    List<string>? BrandNames,
-    List<string> AvailableForms,
-    List<string> AvailableStrengths,
-    string? Manufacturer
-);
-
-public record InteractingMedicationInfo(Guid? MedicationId, string Name);
-
-public record MedicationInteractionWarning(
-    List<InteractingMedicationInfo> InteractingMedications,
-    InteractionSeverity Severity,
-    string Description,
-    string Source
-);
-
-// --- Request DTOs (Data Transfer Objects) ---
-public record CreateMedicationRequest(
-    string Name,
-    string? GenericName,
-    string? BrandName,
-    string Strength,
-    string Form,
-    string? Shape,
-    string? Color,
-    string? Notes,
-    DateOnly StartDate,
-    DateOnly? EndDate,
-    List<CreateScheduleRequest> Schedules
-);
-
-public record CreateScheduleRequest(
-    FrequencyType FrequencyType,
-    int? Interval,
-    List<DayOfWeek>? DaysOfWeek,
-    List<TimeOnly> TimesOfDay,
-    double? Quantity,
-    string? Unit
-);
-
-public record UpdateMedicationRequest(
-    string? Name,
-    string? GenericName,
-    string? BrandName,
-    string? Strength,
-    string? Form,
-    string? Shape,
-    string? Color,
-    string? Notes,
-    DateOnly? StartDate,
-    DateOnly? EndDate,
-    bool? IsArchived,
-    List<CreateScheduleRequest>? Schedules // For simplicity, reusing CreateScheduleRequest; could be UpdateScheduleRequest
-);
-
-public record LogMedicationRequest(
-    DateTimeOffset TakenAt,
-    LogStatus Status,
-    Guid? ScheduleId,
-    double? QuantityTaken,
-    string? Notes
-);
-
-public record UpdateMedicationLogRequest(
-    DateTimeOffset? TakenAt,
-    LogStatus? Status,
-    double? QuantityTaken,
-    string? Notes
-);
-
-public record CheckInteractionRequest(
-    List<Guid>? MedicationIds, // IDs of medications already in the user's list
-    MedicationDefinition? NewMedication, // Simplified: details of a new medication not yet saved
-    List<Guid>? ExistingMedicationIds // Alternative: IDs of existing meds to check against the new one
-);

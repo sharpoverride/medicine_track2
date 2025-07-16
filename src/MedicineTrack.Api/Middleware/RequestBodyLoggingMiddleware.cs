@@ -1,5 +1,7 @@
 using System.Text;
 
+namespace MedicineTrack.Api.Middleware;
+
 public class RequestBodyLoggingMiddleware
 {
     private readonly RequestDelegate _next;
