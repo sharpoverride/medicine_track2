@@ -9,6 +9,15 @@ var postgres = builder.AddPostgres("postgresdb");
 var medicationDb = postgres.AddDatabase("medicationdb");
 var configurationDb = postgres.AddDatabase("configurationdb");
 
+// Migration projects - run these first to set up databases
+var medicationMigrations = builder.AddProject<Projects.MedicineTrack_Medication_Migrations>("medication-migrations")
+    .WithReference(medicationDb)
+    .WithArgs("migrate");
+
+var configurationMigrations = builder.AddProject<Projects.MedicineTrack_Configuration_Migrations>("configuration-migrations")
+    .WithReference(configurationDb)
+    .WithArgs("migrate");
+
 // Application services
 var apiService = builder.AddProject<Projects.MedicineTrack_Api>("medicine-track-api")
     .WithReference(valkeyCache)
