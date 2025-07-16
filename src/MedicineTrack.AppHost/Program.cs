@@ -37,4 +37,12 @@ var gatewayService = builder.AddProject<Projects.MedicineTrack_Gateway>("medicin
     .WithReference(configService)
     .WithHttpEndpoint(port: 5000, name: "gateway-http");
 
+// End-to-End Tests - runs continuously to test the APIs
+var end2endTests = builder.AddProject<Projects.MedicineTrack_End2EndTests>("medicine-track-e2e-tests")
+    .WithReference(apiService)
+    .WithReference(configService)
+    .WaitFor(apiService)
+    .WaitFor(configService)
+    .WithArgs("--interval", "10"); // Run every 10 minutes
+
 builder.Build().Run();
