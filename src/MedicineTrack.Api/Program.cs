@@ -3,6 +3,8 @@ using MedicineTrack.Api.Configuration;
 using MedicineTrack.Api.Models;
 using MedicineTrack.Api.DTOs;
 using MedicineTrack.Api.Middleware;
+using MedicineTrack.Medication.Data.Models;
+using MedicineTrack.Configuration.Data.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 

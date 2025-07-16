@@ -1,4 +1,4 @@
-using MedicineTrack.Api.Models;
+using MedicineTrack.Medication.Data.Models;
 
 namespace MedicineTrack.Api.DTOs;
 

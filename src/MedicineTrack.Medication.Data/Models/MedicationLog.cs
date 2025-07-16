@@ -1,4 +1,4 @@
-namespace MedicineTrack.Api.Models;
+namespace MedicineTrack.Medication.Data.Models;
 
 public record MedicationLog(
     Guid Id,

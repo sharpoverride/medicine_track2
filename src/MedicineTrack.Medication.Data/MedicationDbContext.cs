@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using MedicineTrack.Api.Models;
+using MedicineTrack.Medication.Data.Models;
 
 namespace MedicineTrack.Medication.Data;
 
@@ -12,7 +12,7 @@ public class MedicationDbContext : DbContext
     {
     }
 
-    public DbSet<Api.Models.Medication> Medications { get; set; } = null!;
+    public DbSet<Models.Medication> Medications { get; set; } = null!;
     public DbSet<Schedule> Schedules { get; set; } = null!;
     public DbSet<MedicationLog> MedicationLogs { get; set; } = null!;
 
@@ -21,7 +21,7 @@ public class MedicationDbContext : DbContext
         base.OnModelCreating(modelBuilder);
 
         // Configure Medication entity
-        modelBuilder.Entity<Api.Models.Medication>(entity =>
+        modelBuilder.Entity<Models.Medication>(entity =>
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
@@ -70,7 +70,7 @@ public class MedicationDbContext : DbContext
             // UserId is a foreign key reference to User in ConfigurationDb
             entity.Property(e => e.UserId).IsRequired();
                 
-            entity.HasOne<Api.Models.Medication>()
+            entity.HasOne<Models.Medication>()
                 .WithMany()
                 .HasForeignKey(e => e.MedicationId)
                 .OnDelete(DeleteBehavior.Cascade);

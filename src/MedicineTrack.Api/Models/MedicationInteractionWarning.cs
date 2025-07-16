@@ -1,3 +1,5 @@
+using MedicineTrack.Medication.Data.Models;
+
 namespace MedicineTrack.Api.Models;
 
 public record InteractingMedicationInfo(Guid? MedicationId, string Name);

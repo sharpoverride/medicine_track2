@@ -1,6 +1,6 @@
-using MedicineTrack.Api.Models;
-
 namespace MedicineTrack.Api.Repositories;
+
+using Medication = MedicineTrack.Medication.Data.Models.Medication;
 
 public interface IMedicationRepository : IRepository<Medication>
 {

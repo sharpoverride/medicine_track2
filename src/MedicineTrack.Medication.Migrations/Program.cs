@@ -25,7 +25,7 @@ class Program
         Console.WriteLine($"Using connection string: {connectionString}");
 
         var optionsBuilder = new DbContextOptionsBuilder<MedicationDbContext>();
-        optionsBuilder.UseNpgsql(connectionString);
+        optionsBuilder.UseNpgsql(connectionString, b => b.MigrationsAssembly("MedicineTrack.Medication.Migrations"));
 
         using var context = new MedicationDbContext(optionsBuilder.Options);
 

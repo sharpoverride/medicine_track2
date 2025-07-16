@@ -1,6 +1,6 @@
-using MedicineTrack.Api.Models;
-
 namespace MedicineTrack.Api.Services;
+
+using MedicineTrack.Configuration.Data.Models;
 
 public interface IMedicationDatabaseService
 {

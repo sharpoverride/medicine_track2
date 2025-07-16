@@ -1,4 +1,4 @@
-namespace MedicineTrack.Api.Models;
+namespace MedicineTrack.Configuration.Data.Models;
 
 public record User(
     Guid Id, 

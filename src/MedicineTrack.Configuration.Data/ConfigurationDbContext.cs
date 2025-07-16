@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using MedicineTrack.Api.Models;
+using MedicineTrack.Configuration.Data.Models;
 
 namespace MedicineTrack.Configuration.Data;
 

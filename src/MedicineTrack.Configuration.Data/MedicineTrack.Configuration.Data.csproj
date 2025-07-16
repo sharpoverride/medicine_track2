@@ -19,8 +19,4 @@
     </PackageReference>
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="../MedicineTrack.Api/MedicineTrack.Api.csproj" />
-  </ItemGroup>
-
 </Project>

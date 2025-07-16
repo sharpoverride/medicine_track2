@@ -1,7 +1,6 @@
-using MedicineTrack.Api.Models;
-using MedicineTrack.Api.DTOs;
-
 namespace MedicineTrack.Api.Services;
+using DTOs;
+using Medication.Data.Models;
 
 public interface IMedicationLogService
 {
