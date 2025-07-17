@@ -6,7 +6,7 @@
 @userId = {{$guid}}
 @medicationId = {{$guid}}
 @logId = {{$guid}}
-@startDate = {{$datetime "YYYY-MM-DD"}}
+@startDate = {{$datetime("YYYY-MM-DD")}}
 
 
 
