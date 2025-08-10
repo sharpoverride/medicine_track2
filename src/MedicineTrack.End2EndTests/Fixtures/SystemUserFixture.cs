@@ -19,7 +19,7 @@ public class SystemUserFixture : IAsyncLifetime
         _logger = logger;
     }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         try
         {
@@ -40,7 +40,7 @@ public class SystemUserFixture : IAsyncLifetime
         }
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         try
         {

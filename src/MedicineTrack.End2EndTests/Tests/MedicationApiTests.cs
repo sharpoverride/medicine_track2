@@ -21,7 +21,7 @@ public class MedicationApiTests : IAsyncLifetime
         _logger = logger;
     }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         // SystemUserFixture is already initialized by xUnit when used as IClassFixture
         // For our custom scheduler, we ensure it's initialized here
@@ -31,11 +31,11 @@ public class MedicationApiTests : IAsyncLifetime
         }
     }
 
-    public async Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         // Let xUnit handle disposal when used as IClassFixture
         // For our custom scheduler, we handle disposal here
-        await Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact]

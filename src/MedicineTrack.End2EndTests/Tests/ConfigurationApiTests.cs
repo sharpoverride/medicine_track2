@@ -21,7 +21,7 @@ public class ConfigurationApiTests : IAsyncLifetime
         _logger = logger;
     }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         // Initialize the SystemUserFixture
         if (_systemUserFixture.SystemUserId == Guid.Empty)
@@ -30,10 +30,10 @@ public class ConfigurationApiTests : IAsyncLifetime
         }
     }
 
-    public async Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         // Cleanup handled by DI container
-        await Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact]
