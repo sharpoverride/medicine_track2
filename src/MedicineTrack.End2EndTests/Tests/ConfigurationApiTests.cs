@@ -5,7 +5,7 @@ using Xunit;
 
 namespace MedicineTrack.End2EndTests.Tests;
 
-public class ConfigurationApiTests : IClassFixture<SystemUserFixture>
+public class ConfigurationApiTests : IAsyncLifetime
 {
     private readonly HttpClient _configHttpClient;
     private readonly SystemUserFixture _systemUserFixture;
@@ -19,6 +19,21 @@ public class ConfigurationApiTests : IClassFixture<SystemUserFixture>
         _configHttpClient = httpClientFactory.CreateClient("medicine-track-config");
         _systemUserFixture = systemUserFixture;
         _logger = logger;
+    }
+
+    public async Task InitializeAsync()
+    {
+        // Initialize the SystemUserFixture
+        if (_systemUserFixture.SystemUserId == Guid.Empty)
+        {
+            await _systemUserFixture.InitializeAsync();
+        }
+    }
+
+    public async Task DisposeAsync()
+    {
+        // Cleanup handled by DI container
+        await Task.CompletedTask;
     }
 
     [Fact]

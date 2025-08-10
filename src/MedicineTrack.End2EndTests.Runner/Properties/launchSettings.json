@@ -1,0 +1,94 @@
+{
+  "profiles": {
+    "MedicineTrack.End2EndTests.Runner": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development",
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "MEDICINE_TRACK_API_URL": "http://localhost:5001",
+        "MEDICINE_TRACK_CONFIG_URL": "http://localhost:5002"
+      }
+    },
+    "MedicineTrack.End2EndTests.Runner (Quick Run)": {
+      "commandName": "Project",
+      "commandLineArgs": "--runs 3 --interval 1",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development",
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "MEDICINE_TRACK_API_URL": "http://localhost:5001",
+        "MEDICINE_TRACK_CONFIG_URL": "http://localhost:5002"
+      }
+    },
+    "MedicineTrack.End2EndTests (Extended Run)": {
+      "commandName": "Project",
+      "commandLineArgs": "--runs 50 --interval 5",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development",
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "MEDICINE_TRACK_API_URL": "http://localhost:5001",
+        "MEDICINE_TRACK_CONFIG_URL": "http://localhost:5002"
+      }
+    },
+    "MedicineTrack.End2EndTests (Continuous)": {
+      "commandName": "Project",
+      "commandLineArgs": "--interval 2",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development",
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "MEDICINE_TRACK_API_URL": "http://localhost:5001",
+        "MEDICINE_TRACK_CONFIG_URL": "http://localhost:5002"
+      }
+    },
+    "MedicineTrack.End2EndTests (No Startup)": {
+      "commandName": "Project",
+      "commandLineArgs": "--no-startup --interval 10",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development",
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "MEDICINE_TRACK_API_URL": "http://localhost:5001",
+        "MEDICINE_TRACK_CONFIG_URL": "http://localhost:5002"
+      }
+    },
+    "MedicineTrack.End2EndTests (Alternative HTTP Endpoints)": {
+      "commandName": "Project",
+      "commandLineArgs": "--runs 3 --interval 1",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development",
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "MEDICINE_TRACK_API_URL": "http://localhost:5155",
+        "MEDICINE_TRACK_CONFIG_URL": "http://localhost:5111"
+      }
+    },
+    "MedicineTrack.End2EndTests (HTTPS Endpoints)": {
+      "commandName": "Project",
+      "commandLineArgs": "--runs 3 --interval 1",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development",
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "MEDICINE_TRACK_API_URL": "https://localhost:7001",
+        "MEDICINE_TRACK_CONFIG_URL": "https://localhost:7263"
+      }
+    }
+  }
+}

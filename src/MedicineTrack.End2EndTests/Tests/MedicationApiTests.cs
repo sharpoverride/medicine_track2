@@ -5,7 +5,7 @@ using Xunit;
 
 namespace MedicineTrack.End2EndTests.Tests;
 
-public class MedicationApiTests : IClassFixture<SystemUserFixture>
+public class MedicationApiTests : IAsyncLifetime
 {
     private readonly HttpClient _medicationHttpClient;
     private readonly SystemUserFixture _systemUserFixture;
@@ -19,6 +19,23 @@ public class MedicationApiTests : IClassFixture<SystemUserFixture>
         _medicationHttpClient = httpClientFactory.CreateClient("medicine-track-api");
         _systemUserFixture = systemUserFixture;
         _logger = logger;
+    }
+
+    public async Task InitializeAsync()
+    {
+        // SystemUserFixture is already initialized by xUnit when used as IClassFixture
+        // For our custom scheduler, we ensure it's initialized here
+        if (_systemUserFixture.SystemUserId == Guid.Empty)
+        {
+            await _systemUserFixture.InitializeAsync();
+        }
+    }
+
+    public async Task DisposeAsync()
+    {
+        // Let xUnit handle disposal when used as IClassFixture
+        // For our custom scheduler, we handle disposal here
+        await Task.CompletedTask;
     }
 
     [Fact]

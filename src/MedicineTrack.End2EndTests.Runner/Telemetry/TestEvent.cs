@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Logging;
 
-namespace MedicineTrack.End2EndTests.Telemetry;
+namespace MedicineTrack.End2EndTests.Runner.Telemetry;
 
 public enum TestEventType
 {

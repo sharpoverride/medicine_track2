@@ -14,7 +14,8 @@ var medicationMigrations = builder.AddProject<Projects.MedicineTrack_Medication_
     .WithReference(medicationDb)
     .WithArgs("migrate");
 
-var configurationMigrations = builder.AddProject<Projects.MedicineTrack_Configuration_Migrations>("configuration-migrations")
+var configurationMigrations = builder
+    .AddProject<Projects.MedicineTrack_Configuration_Migrations>("configuration-migrations")
     .WithReference(configurationDb)
     .WithArgs("migrate");
 
@@ -35,14 +36,17 @@ var configService = builder.AddProject<Projects.MedicineTrack_Configuration>("me
 var gatewayService = builder.AddProject<Projects.MedicineTrack_Gateway>("medicine-track-gateway")
     .WithReference(apiService)
     .WithReference(configService)
-    .WithHttpEndpoint(port: 5000, name: "gateway-http");
-
-// End-to-End Tests - runs continuously to test the APIs
-var end2endTests = builder.AddProject<Projects.MedicineTrack_End2EndTests>("medicine-track-e2e-tests")
-    .WithReference(apiService)
-    .WithReference(configService)
     .WaitFor(apiService)
     .WaitFor(configService)
-    .WithArgs("--interval", "10"); // Run every 10 minutes
+    .WithHttpEndpoint(port: 5000, name: "gateway-http");
 
-builder.Build().Run();
+var end2endTestsRunner = builder
+    .AddProject<Projects.MedicineTrack_End2EndTests_Runner>("medicine-track-e2e-tests-runner")
+    .WithReference(apiService)
+    .WithReference(configService)
+    .WithReference(gatewayService)
+    .WaitFor(gatewayService);
+   // .WithArgs("--interval", "10");
+
+var build = builder.Build();
+build.Run();

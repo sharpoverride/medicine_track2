@@ -10,15 +10,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Aspire.Hosting.AppHost" Version="9.3.0" />
-    <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="9.3.0" />
-    <PackageReference Include="Aspire.Hosting.Redis" Version="9.3.0" />
+    <PackageReference Include="Aspire.Hosting.AppHost" Version="9.4.0" />
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="9.4.0" />
+    <PackageReference Include="Aspire.Hosting.Redis" Version="9.4.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\MedicineTrack.Api\MedicineTrack.Api.csproj" />
     <ProjectReference Include="..\MedicineTrack.Configuration.Migrations\MedicineTrack.Configuration.Migrations.csproj" />
-    <ProjectReference Include="..\MedicineTrack.End2EndTests\MedicineTrack.End2EndTests.csproj" />
+    <ProjectReference Include="..\MedicineTrack.End2EndTests.Runner\MedicineTrack.End2EndTests.Runner.csproj" />
     <ProjectReference Include="..\MedicineTrack.Gateway\MedicineTrack.Gateway.csproj" />
     <ProjectReference Include="..\MedicineTrack.Configuration\MedicineTrack.Configuration.csproj" />
     <ProjectReference Include="..\MedicineTrack.Medication.Migrations\MedicineTrack.Medication.Migrations.csproj" />

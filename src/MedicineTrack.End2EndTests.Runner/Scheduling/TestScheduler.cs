@@ -1,9 +1,10 @@
 using System.Reflection;
-using MedicineTrack.End2EndTests.Telemetry;
-using MedicineTrack.End2EndTests.Tests;
+using MedicineTrack.End2EndTests.Runner.Telemetry;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
-namespace MedicineTrack.End2EndTests.Scheduling;
+namespace MedicineTrack.End2EndTests.Runner.Scheduling;
 
 public class TestSchedulerOptions
 {
@@ -103,10 +104,27 @@ public class TestScheduler
             var testInstance = ActivatorUtilities.CreateInstance(_serviceProvider, testClass);
             var testMethods = GetTestMethods(testClass);
 
-            foreach (var method in testMethods)
+            // Initialize the test instance if it implements IAsyncLifetime
+            if (testInstance is IAsyncLifetime asyncLifetime)
             {
-                var testResult = await ExecuteTestMethodAsync(testInstance, method, nextRun);
-                results.Add(testResult);
+                await asyncLifetime.InitializeAsync();
+            }
+
+            try
+            {
+                foreach (var method in testMethods)
+                {
+                    var testResult = await ExecuteTestMethodAsync(testInstance, method, nextRun);
+                    results.Add(testResult);
+                }
+            }
+            finally
+            {
+                // Clean up the test instance if it implements IAsyncLifetime
+                if (testInstance is IAsyncLifetime asyncLifetimeDispose)
+                {
+                    await asyncLifetimeDispose.DisposeAsync();
+                }
             }
         }
 
@@ -163,7 +181,10 @@ public class TestScheduler
 
     private static List<Type> GetTestClasses()
     {
-        return Assembly.GetExecutingAssembly()
+        // Load the test assembly (MedicineTrack.End2EndTests)
+        var testAssembly = Assembly.LoadFrom(Path.Combine(AppContext.BaseDirectory, "MedicineTrack.End2EndTests.dll"));
+        
+        return testAssembly
             .GetTypes()
             .Where(t => t.IsClass && !t.IsAbstract && HasTestMethods(t))
             .ToList();
