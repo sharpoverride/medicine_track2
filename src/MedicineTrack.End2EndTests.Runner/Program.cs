@@ -64,6 +64,8 @@ public class Program
                 logging.AddConsole();
                 logging.SetMinimumLevel(LogLevel.Information);
             });
+        
+        await Task.Delay(TimeSpan.FromMinutes(2));
 
         var host = builder.Build();
 

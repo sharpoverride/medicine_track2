@@ -2,7 +2,6 @@ using System.Reflection;
 using MedicineTrack.End2EndTests.Runner.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Xunit;
 
 namespace MedicineTrack.End2EndTests.Runner.Scheduling;
 
@@ -104,10 +103,19 @@ public class TestScheduler
             var testInstance = ActivatorUtilities.CreateInstance(_serviceProvider, testClass);
             var testMethods = GetTestMethods(testClass);
 
-            // Initialize the test instance if it implements IAsyncLifetime
-            if (testInstance is IAsyncLifetime asyncLifetime)
+            // Initialize the test instance if it exposes InitializeAsync()
+            var initMethod = testClass.GetMethod("InitializeAsync", BindingFlags.Instance | BindingFlags.Public);
+            if (initMethod != null && initMethod.GetParameters().Length == 0)
             {
-                await asyncLifetime.InitializeAsync();
+                var initResult = initMethod.Invoke(testInstance, null);
+                if (initResult is Task initTask)
+                {
+                    await initTask.ConfigureAwait(false);
+                }
+                else if (initResult is ValueTask initVt)
+                {
+                    await initVt.ConfigureAwait(false);
+                }
             }
 
             try
@@ -120,10 +128,19 @@ public class TestScheduler
             }
             finally
             {
-                // Clean up the test instance if it implements IAsyncLifetime
-                if (testInstance is IAsyncLifetime asyncLifetimeDispose)
+                // Clean up the test instance if it exposes DisposeAsync()
+                var disposeMethod = testClass.GetMethod("DisposeAsync", BindingFlags.Instance | BindingFlags.Public);
+                if (disposeMethod != null && disposeMethod.GetParameters().Length == 0)
                 {
-                    await asyncLifetimeDispose.DisposeAsync();
+                    var disposeResult = disposeMethod.Invoke(testInstance, null);
+                    if (disposeResult is Task disposeTask)
+                    {
+                        await disposeTask.ConfigureAwait(false);
+                    }
+                    else if (disposeResult is ValueTask disposeVt)
+                    {
+                        await disposeVt.ConfigureAwait(false);
+                    }
                 }
             }
         }
@@ -145,10 +162,14 @@ public class TestScheduler
 
         try
         {
-            var result = method.Invoke(testInstance, null);
+            var result = method.Invoke(testInstance, method.GetParameters().Length == 0 ? null : new object?[method.GetParameters().Length]);
             if (result is Task task)
             {
-                await task;
+                await task.ConfigureAwait(false);
+            }
+            else if (result is ValueTask vt)
+            {
+                await vt.ConfigureAwait(false);
             }
 
             var duration = DateTime.UtcNow - startTime;
@@ -193,16 +214,29 @@ public class TestScheduler
     private static bool HasTestMethods(Type type)
     {
         return type.GetMethods(BindingFlags.Public | BindingFlags.Instance)
-            .Any(m => m.GetCustomAttributes(typeof(FactAttribute), true).Any() ||
-                      m.GetCustomAttributes(typeof(TheoryAttribute), true).Any());
+            .Any(m => HasXunitAttribute(m));
     }
 
     private static List<MethodInfo> GetTestMethods(Type type)
     {
         return type.GetMethods(BindingFlags.Public | BindingFlags.Instance)
-            .Where(m => m.GetCustomAttributes(typeof(FactAttribute), true).Any() ||
-                        m.GetCustomAttributes(typeof(TheoryAttribute), true).Any())
+            .Where(m => HasXunitAttribute(m))
             .ToList();
+    }
+
+    private static bool HasXunitAttribute(MethodInfo method)
+    {
+        // Match by attribute full name to avoid taking hard dependency on xUnit types
+        foreach (var cad in method.CustomAttributes)
+        {
+            var attrName = cad.AttributeType.FullName;
+            if (string.Equals(attrName, "Xunit.FactAttribute", StringComparison.Ordinal) ||
+                string.Equals(attrName, "Xunit.TheoryAttribute", StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 }
 
