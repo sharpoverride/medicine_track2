@@ -1,5 +1,6 @@
 using Yarp.ReverseProxy.Configuration;
 using OpenTelemetry.Logs;
+using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,6 +12,13 @@ builder.Logging.AddOpenTelemetry(options =>
     options.ParseStateValues = true;
     options.AddOtlpExporter();
 });
+
+// Add OpenTelemetry tracing so inbound/outbound HTTP are correlated
+builder.Services.AddOpenTelemetry()
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddOtlpExporter());
 
 // Add services to the container.
 builder.Services.AddOpenApi();

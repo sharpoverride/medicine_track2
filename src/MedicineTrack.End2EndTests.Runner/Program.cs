@@ -4,16 +4,20 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OpenTelemetry.Logs;
+using OpenTelemetry.Trace;
+using System.Diagnostics;
 
 namespace MedicineTrack.End2EndTests.Runner;
 
 public class Program
 {
+    private static readonly ActivitySource ActivitySource = new("medicine-track-e2e");
+
     public static async Task Main(string[] args)
     {
         var options = ParseArgs(args);
 
-var builder = Host.CreateDefaultBuilder(args)
+        var builder = Host.CreateDefaultBuilder(args)
             .ConfigureLogging(logging =>
             {
                 logging.AddOpenTelemetry(options =>
@@ -60,6 +64,13 @@ var builder = Host.CreateDefaultBuilder(args)
                 Console.WriteLine("   ✅ medicine-track-api: Configured with service discovery");
                 Console.WriteLine("   ✅ medicine-track-config: Configured with service discovery");
                 Console.WriteLine("   ✅ medicine-track-gateway: Configured with service discovery");
+
+                // OpenTelemetry tracing for the runner: parent spans + HttpClient propagation
+                services.AddOpenTelemetry()
+                    .WithTracing(tp => tp
+                        .AddSource("medicine-track-e2e")
+                        .AddHttpClientInstrumentation()
+                        .AddOtlpExporter());
 
                 // Register services
                 services.AddSingleton(options);
@@ -108,9 +119,14 @@ var builder = Host.CreateDefaultBuilder(args)
 
     private static async Task PingAsync(HttpClient client, string path, string name, ILogger logger, CancellationToken ct)
     {
+        using var activity = ActivitySource.StartActivity($"ping {name}", ActivityKind.Client);
+        activity?.SetTag("test.suite", "e2e");
+        activity?.SetTag("test.name", $"ping_{name}");
+
         try
         {
             var resp = await client.GetAsync(path, ct);
+            activity?.SetTag("http.status_code", (int)resp.StatusCode);
             if (!resp.IsSuccessStatusCode)
             {
                 logger.LogWarning("{Name} health: {Status}", name, resp.StatusCode);
@@ -122,6 +138,7 @@ var builder = Host.CreateDefaultBuilder(args)
         }
         catch (Exception ex)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             logger.LogWarning(ex, "{Name} health ping failed", name);
         }
     }

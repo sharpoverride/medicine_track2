@@ -20,8 +20,8 @@ namespace MedicineTrack.End2EndTests
             // This allows for flexible configuration for different test environments.
             var builder = new ConfigurationBuilder()
                 .SetBasePath(AppContext.BaseDirectory)
-                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-                .AddEnvironmentVariables();
+                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+                // .AddEnvironmentVariables();
 
             Configuration = builder.Build();
         }

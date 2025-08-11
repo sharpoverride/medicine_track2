@@ -6,6 +6,7 @@ using MedicineTrack.Api.Middleware;
 using MedicineTrack.Medication.Data.Models;
 using MedicineTrack.Configuration.Data.Models;
 using OpenTelemetry.Logs;
+using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +18,14 @@ builder.Logging.AddOpenTelemetry(options =>
     options.ParseStateValues = true;
     options.AddOtlpExporter(); // Honors OTEL_* env vars provided by Aspire
 });
+
+// Add OpenTelemetry tracing (HTTP server/client + EF Core) to feed Aspire tracer
+builder.Services.AddOpenTelemetry()
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddEntityFrameworkCoreInstrumentation()
+        .AddOtlpExporter()); // Honors OTEL_* env vars
 
 // Add services to the container.
 builder.Services.AddOpenApi();
