@@ -1,6 +1,16 @@
 using Yarp.ReverseProxy.Configuration;
+using OpenTelemetry.Logs;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Add OpenTelemetry logging to feed Aspire dashboard structured logs
+builder.Logging.AddOpenTelemetry(options =>
+{
+    options.IncludeScopes = true;
+    options.IncludeFormattedMessage = true;
+    options.ParseStateValues = true;
+    options.AddOtlpExporter();
+});
 
 // Add services to the container.
 builder.Services.AddOpenApi();

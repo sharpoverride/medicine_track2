@@ -3,6 +3,7 @@ using MedicineTrack.End2EndTests.Runner.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using OpenTelemetry.Logs;
 
 namespace MedicineTrack.End2EndTests.Runner;
 
@@ -12,7 +13,17 @@ public class Program
     {
         var options = ParseArgs(args);
 
-        var builder = Host.CreateDefaultBuilder(args)
+var builder = Host.CreateDefaultBuilder(args)
+            .ConfigureLogging(logging =>
+            {
+                logging.AddOpenTelemetry(options =>
+                {
+                    options.IncludeScopes = true;
+                    options.IncludeFormattedMessage = true;
+                    options.ParseStateValues = true;
+                    options.AddOtlpExporter();
+                });
+            })
             .ConfigureServices((hostContext, services) =>
             {
                 // Add service discovery for Aspire (core + providers)
