@@ -20,13 +20,4 @@
         <PackageReference Include="System.Text.Json" Version="9.0.8" />
         <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="9.7.0" />
     </ItemGroup>
-
-    <ItemGroup>
-        <ProjectReference Include="../MedicineTrack.End2EndTests/MedicineTrack.End2EndTests.csproj" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <Folder Include="obj\Debug\" />
-    </ItemGroup>
-
 </Project>

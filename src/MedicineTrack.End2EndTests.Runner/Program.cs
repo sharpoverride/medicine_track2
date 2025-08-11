@@ -52,12 +52,9 @@ public class Program
 
                 // Register services
                 services.AddSingleton(options);
-                services.AddSingleton<TestScheduler>();
-                services.AddSingleton<ITelemetryReporter, ConsoleTelemetryReporter>();
-                services.AddLogging(cfg => cfg.AddConsole());
 
                 // Add test fixtures and other services from the test assembly
-                services.AddSingleton<MedicineTrack.End2EndTests.Fixtures.SystemUserFixture>();
+                // services.AddSingleton<Fixtures.SystemUserFixture>();
             })
             .ConfigureLogging((hostingContext, logging) =>
             {
@@ -65,38 +62,56 @@ public class Program
                 logging.SetMinimumLevel(LogLevel.Information);
             });
         
-        await Task.Delay(TimeSpan.FromMinutes(2));
-
         var host = builder.Build();
 
         using var scope = host.Services.CreateScope();
         var services = scope.ServiceProvider;
-        var scheduler = services.GetRequiredService<TestScheduler>();
         var logger = services.GetRequiredService<ILogger<Program>>();
         logger.LogInformation("🚀 Resolving HttpClients for each service...");
         var httpGatewayService = services.GetRequiredService<IHttpClientFactory>().CreateClient("medicine-track-gateway");
         var httpApiService = services.GetRequiredService<IHttpClientFactory>().CreateClient("medicine-track-api");
         var httpConfigService = services.GetRequiredService<IHttpClientFactory>().CreateClient("medicine-track-config");
 
+        logger.LogInformation("🚀 MedicineTrack E2E Runner initialized. Starting 1s health pings for gateway/api/config...");
+        using var cts = new CancellationTokenSource();
+        Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
+
+        // Periodically ping health endpoints every second
+        var periodicTimer = new PeriodicTimer(TimeSpan.FromSeconds(1));
         try
         {
-            logger.LogInformation("🚀 Starting MedicineTrack End-to-End Test Runner");
-            logger.LogInformation($"📊 Interval: {options.Interval}, Max Runs: {options.MaxRuns?.ToString() ?? "unlimited"}");
-            // call the health endpoint for each service
-            var healthCheckResponse = await httpGatewayService.GetAsync("/health");
-            var healthCheckResponseConfig = await httpConfigService.GetAsync("/health");
-            var healthCheckResponseApi = await httpApiService.GetAsync("/health");
-
-            // Start test scheduler
-            await scheduler.StartAsync();
-
-            Console.WriteLine("\n⏹️  Press any key to stop the scheduler...");
-            Console.ReadKey();
+            while (await periodicTimer.WaitForNextTickAsync(cts.Token))
+            {
+                _ = PingAsync(httpGatewayService, "/health", "gateway", logger, cts.Token);
+                _ = PingAsync(httpApiService, "/health", "api", logger, cts.Token);
+                _ = PingAsync(httpConfigService, "/health", "config", logger, cts.Token);
+            }
         }
-        finally
+        catch (OperationCanceledException)
         {
-            logger.LogInformation("🛑 Stopping test scheduler...");
-            await scheduler.StopAsync();
+            logger.LogInformation("🛑 Cancellation requested. Stopping health pings...");
+        }
+
+        logger.LogInformation("✅ Runner exited cleanly.");
+    }
+
+    private static async Task PingAsync(HttpClient client, string path, string name, ILogger logger, CancellationToken ct)
+    {
+        try
+        {
+            var resp = await client.GetAsync(path, ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                logger.LogWarning("{Name} health: {Status}", name, resp.StatusCode);
+            }
+            else
+            {
+                logger.LogDebug("{Name} health OK", name);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "{Name} health ping failed", name);
         }
     }
 
