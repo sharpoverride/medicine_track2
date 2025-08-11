@@ -7,6 +7,7 @@ using MedicineTrack.Medication.Data.Models;
 using MedicineTrack.Configuration.Data.Models;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Trace;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,13 +19,19 @@ builder.Logging.AddOpenTelemetry(options =>
     options.ParseStateValues = true;
     options.AddOtlpExporter(); // Honors OTEL_* env vars provided by Aspire
 });
+// Enrich logs with Activity context so TraceId/SpanId are present in structured logs
+builder.Services.Configure<LoggerFactoryOptions>(o =>
+{
+    o.ActivityTrackingOptions = ActivityTrackingOptions.TraceId | ActivityTrackingOptions.SpanId | ActivityTrackingOptions.ParentId | ActivityTrackingOptions.Baggage | ActivityTrackingOptions.Tags;
+});
 
 // Add OpenTelemetry tracing (HTTP server/client + EF Core) to feed Aspire tracer
 builder.Services.AddOpenTelemetry()
-    .WithTracing(tracing => tracing
+.WithTracing(tracing => tracing
         .AddAspNetCoreInstrumentation()
         .AddHttpClientInstrumentation()
         .AddEntityFrameworkCoreInstrumentation()
+        .AddSource("Npgsql")
         .AddOtlpExporter()); // Honors OTEL_* env vars
 
 // Add services to the container.
@@ -297,6 +304,32 @@ app.MapPost($"{baseApiRoute}/users/{{userId:guid}}/medication-interactions/check
 .Produces<List<MedicationInteractionWarning>>()
 .Produces(StatusCodes.Status400BadRequest);
 
-app.MapGet("health", () => "MedicineTrack API is OK");
+app.MapGet("health", async (ILogger<Program> logger, IConfiguration config) =>
+{
+    logger.LogInformation("Health endpoint hit");
+
+    try
+    {
+        var cs = config.GetConnectionString("medicationdb") ?? config.GetConnectionString("MedicationDb");
+        if (!string.IsNullOrWhiteSpace(cs))
+        {
+            await using var conn = new NpgsqlConnection(cs);
+            await conn.OpenAsync();
+            await using var cmd = new NpgsqlCommand("SELECT 1", conn);
+            var result = await cmd.ExecuteScalarAsync();
+            logger.LogDebug("DB ping result: {Result}", result);
+        }
+        else
+        {
+            logger.LogWarning("No connection string found for medicationdb; skipping DB ping");
+        }
+    }
+    catch (Exception ex)
+    {
+        logger.LogWarning(ex, "Health DB ping failed");
+    }
+
+    return "MedicineTrack API is OK";
+});
 
 app.Run();

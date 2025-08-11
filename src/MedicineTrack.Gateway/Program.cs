@@ -1,6 +1,7 @@
 using Yarp.ReverseProxy.Configuration;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Trace;
+using System.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,6 +12,11 @@ builder.Logging.AddOpenTelemetry(options =>
     options.IncludeFormattedMessage = true;
     options.ParseStateValues = true;
     options.AddOtlpExporter();
+});
+// Enrich logs with Activity context so TraceId/SpanId are present in structured logs
+builder.Services.Configure<LoggerFactoryOptions>(o =>
+{
+    o.ActivityTrackingOptions = ActivityTrackingOptions.TraceId | ActivityTrackingOptions.SpanId | ActivityTrackingOptions.ParentId | ActivityTrackingOptions.Baggage | ActivityTrackingOptions.Tags;
 });
 
 // Add OpenTelemetry tracing so inbound/outbound HTTP are correlated
@@ -49,8 +55,32 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+// Lightweight request/response logging for gateway traffic (no bodies)
+app.Use(async (context, next) =>
+{
+    var logger = app.Logger;
+    var method = context.Request.Method;
+    var path = context.Request.Path.Value;
+    var query = context.Request.QueryString.HasValue ? context.Request.QueryString.Value : string.Empty;
+    var traceId = Activity.Current?.TraceId.ToString();
+    var sw = Stopwatch.StartNew();
+
+    logger.LogInformation("Gateway request started {Method} {Path}{Query} traceId={TraceId}", method, path, query, traceId);
+    await next();
+    sw.Stop();
+
+    var status = context.Response.StatusCode;
+    var length = context.Response.ContentLength;
+    logger.LogInformation("Gateway response completed {Method} {Path}{Query} -> {Status} ({ElapsedMs} ms) contentLength={ContentLength} traceId={TraceId}",
+        method, path, query, status, sw.ElapsedMilliseconds, length, traceId);
+});
+
 // Health check endpoint
-app.MapGet("/health", () => "Gateway is healthy")
+app.MapGet("/health", (ILogger<Program> logger) =>
+{
+    logger.LogInformation("Health endpoint hit");
+    return "Gateway is healthy";
+})
     .WithName("HealthCheck")
     .WithOpenApi();
 

@@ -27,9 +27,18 @@ public class Program
                     options.ParseStateValues = true;
                     options.AddOtlpExporter();
                 });
+                // Enrich logs with Activity context so TraceId/SpanId are present in structured logs
+                
+            
             })
             .ConfigureServices((hostContext, services) =>
             {
+                // Enrich logs with Activity context so TraceId/SpanId are present in structured logs
+                services.Configure<LoggerFactoryOptions>(o =>
+                {
+                    o.ActivityTrackingOptions = ActivityTrackingOptions.TraceId | ActivityTrackingOptions.SpanId | ActivityTrackingOptions.ParentId | ActivityTrackingOptions.Baggage | ActivityTrackingOptions.Tags;
+                });
+
                 // Add service discovery for Aspire (core + providers)
                 services.AddServiceDiscoveryCore();
                 // Use configuration-based resolver in dev/test; DNS SRV can be enabled for k8s
@@ -105,6 +114,9 @@ public class Program
             while (await periodicTimer.WaitForNextTickAsync(cts.Token))
             {
                 _ = PingAsync(httpGatewayService, "/health", "gateway", logger, cts.Token);
+                _ = PingAsync(httpGatewayService, "/medicines/health", "gateway->api", logger, cts.Token);
+                _ = PingAsync(httpGatewayService, "/configs/health", "gateway->config", logger, cts.Token);
+
                 _ = PingAsync(httpApiService, "/health", "api", logger, cts.Token);
                 _ = PingAsync(httpConfigService, "/health", "config", logger, cts.Token);
             }

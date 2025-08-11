@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.Text.Json.Serialization;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Trace;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,12 +14,18 @@ builder.Logging.AddOpenTelemetry(options =>
     options.ParseStateValues = true;
     options.AddOtlpExporter();
 });
+// Enrich logs with Activity context so TraceId/SpanId are present in structured logs
+builder.Services.Configure<LoggerFactoryOptions>(o =>
+{
+    o.ActivityTrackingOptions = ActivityTrackingOptions.TraceId | ActivityTrackingOptions.SpanId | ActivityTrackingOptions.ParentId | ActivityTrackingOptions.Baggage | ActivityTrackingOptions.Tags;
+});
 
 // Add OpenTelemetry tracing for inbound/outbound HTTP
 builder.Services.AddOpenTelemetry()
-    .WithTracing(tracing => tracing
+.WithTracing(tracing => tracing
         .AddAspNetCoreInstrumentation()
         .AddHttpClientInstrumentation()
+        .AddSource("Npgsql")
         .AddOtlpExporter());
 
 // Add services to the container.
@@ -157,7 +164,33 @@ usersGroup.MapDelete("/{userId:guid}", (Guid organizationId, Guid userId) =>
 .Produces(StatusCodes.Status404NotFound);
 
 // Health check
-app.MapGet("/health", () => "Configuration API is healthy")
+app.MapGet("/health", async (ILogger<Program> logger, IConfiguration config) =>
+{
+    logger.LogInformation("Health endpoint hit");
+
+    try
+    {
+        var cs = config.GetConnectionString("configurationdb") ?? config.GetConnectionString("ConfigurationDb");
+        if (!string.IsNullOrWhiteSpace(cs))
+        {
+            await using var conn = new NpgsqlConnection(cs);
+            await conn.OpenAsync();
+            await using var cmd = new NpgsqlCommand("SELECT 1", conn);
+            var result = await cmd.ExecuteScalarAsync();
+            logger.LogDebug("DB ping result: {Result}", result);
+        }
+        else
+        {
+            logger.LogWarning("No connection string found for configurationdb; skipping DB ping");
+        }
+    }
+    catch (Exception ex)
+    {
+        logger.LogWarning(ex, "Health DB ping failed");
+    }
+
+    return "Configuration API is healthy";
+})
     .WithName("HealthCheck")
     .WithOpenApi();
 
