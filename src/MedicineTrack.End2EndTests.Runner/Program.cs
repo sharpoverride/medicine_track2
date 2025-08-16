@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
+using OpenTelemetry.Resources;
 
 namespace MedicineTrack.End2EndTests.Runner;
 
@@ -20,19 +21,29 @@ public class Program
         var builder = Host.CreateDefaultBuilder(args)
             .ConfigureLogging(logging =>
             {
-                logging.AddOpenTelemetry(options =>
-                {
-                    options.IncludeScopes = true;
-                    options.IncludeFormattedMessage = true;
-                    options.ParseStateValues = true;
-                    options.AddOtlpExporter();
-                });
+                // logging.AddOpenTelemetry(options =>
+                // {
+                //     options.IncludeScopes = true;
+                //     options.IncludeFormattedMessage = true;
+                //     options.ParseStateValues = true;
+                //     options.AddOtlpExporter();
+                // });
                 // Enrich logs with Activity context so TraceId/SpanId are present in structured logs
+                
                 
             
             })
             .ConfigureServices((hostContext, services) =>
             {
+                // OpenTelemetry tracing and HttpClient instrumentation (Aspire-like defaults for standalone project)
+                services.AddOpenTelemetry()
+                    .WithTracing(tp => tp
+                        .SetResourceBuilder(OpenTelemetry.Resources.ResourceBuilder.CreateDefault()
+                            .AddService(serviceName: "MedicineTrack.End2EndTests.Runner"))
+                        .AddSource("medicine-track-e2e")
+                        .AddHttpClientInstrumentation()
+                        .AddOtlpExporter());
+
                 // Enrich logs with Activity context so TraceId/SpanId are present in structured logs
                 services.Configure<LoggerFactoryOptions>(o =>
                 {
