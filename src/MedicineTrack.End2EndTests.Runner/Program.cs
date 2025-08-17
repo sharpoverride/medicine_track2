@@ -7,12 +7,15 @@ using OpenTelemetry.Logs;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
 using OpenTelemetry.Resources;
+using OpenTelemetry.Metrics;
 
 namespace MedicineTrack.End2EndTests.Runner;
 
 public class Program
 {
-    private static readonly ActivitySource ActivitySource = new("medicine-track-e2e");
+    // ActivitySource name must match what's registered in OpenTelemetry
+    public const string ActivitySourceName = "end2end-tests-runner";
+    private static readonly ActivitySource ActivitySource = new(ActivitySourceName, "1.0.0");
 
     public static async Task Main(string[] args)
     {
@@ -21,27 +24,46 @@ public class Program
         var builder = Host.CreateDefaultBuilder(args)
             .ConfigureLogging(logging =>
             {
-                // logging.AddOpenTelemetry(options =>
-                // {
-                //     options.IncludeScopes = true;
-                //     options.IncludeFormattedMessage = true;
-                //     options.ParseStateValues = true;
-                //     options.AddOtlpExporter();
-                // });
-                // Enrich logs with Activity context so TraceId/SpanId are present in structured logs
-                
-                
-            
+                logging.AddOpenTelemetry(options =>
+                {
+                    options.IncludeScopes = true;
+                    options.IncludeFormattedMessage = true;
+                    options.ParseStateValues = true;
+                    options.AddOtlpExporter();
+                });
             })
             .ConfigureServices((hostContext, services) =>
             {
-                // OpenTelemetry tracing and HttpClient instrumentation (Aspire-like defaults for standalone project)
+                // Configure OpenTelemetry with proper resource attributes and tracing
                 services.AddOpenTelemetry()
-                    .WithTracing(tp => tp
-                        .SetResourceBuilder(OpenTelemetry.Resources.ResourceBuilder.CreateDefault()
-                            .AddService(serviceName: "MedicineTrack.End2EndTests.Runner"))
-                        .AddSource("medicine-track-e2e")
+                    .ConfigureResource(resource => resource
+                        .AddService(
+                            serviceName: "end2end-tests-runner",
+                            serviceVersion: "1.0.0",
+                            serviceInstanceId: Environment.MachineName))
+                    .WithTracing(tracing => tracing
+                        .AddSource(ActivitySourceName)  // Register our ActivitySource
+                        .AddSource("System.Net.Http")   // Also capture HTTP client activities
+                        .AddHttpClientInstrumentation(options =>
+                        {
+                            options.FilterHttpRequestMessage = (httpRequestMessage) => true;
+                            options.RecordException = true;
+                            options.EnrichWithHttpRequestMessage = (activity, httpRequestMessage) =>
+                            {
+                                activity?.SetTag("http.request.method", httpRequestMessage.Method.ToString());
+                                activity?.SetTag("http.url", httpRequestMessage.RequestUri?.ToString());
+                            };
+                            options.EnrichWithHttpResponseMessage = (activity, httpResponseMessage) =>
+                            {
+                                activity?.SetTag("http.response.status_code", (int)httpResponseMessage.StatusCode);
+                            };
+                        })
+                        .AddAspNetCoreInstrumentation()
+                        .SetSampler(new AlwaysOnSampler())  // Ensure all traces are sampled
+                        .AddOtlpExporter())
+                    .WithMetrics(metrics => metrics
                         .AddHttpClientInstrumentation()
+                        .AddRuntimeInstrumentation()
                         .AddOtlpExporter());
 
                 // Enrich logs with Activity context so TraceId/SpanId are present in structured logs
@@ -85,13 +107,6 @@ public class Program
                 Console.WriteLine("   ✅ medicine-track-config: Configured with service discovery");
                 Console.WriteLine("   ✅ medicine-track-gateway: Configured with service discovery");
 
-                // OpenTelemetry tracing for the runner: parent spans + HttpClient propagation
-                services.AddOpenTelemetry()
-                    .WithTracing(tp => tp
-                        .AddSource("medicine-track-e2e")
-                        .AddHttpClientInstrumentation()
-                        .AddOtlpExporter());
-
                 // Register services
                 services.AddSingleton(options);
 
@@ -105,6 +120,30 @@ public class Program
             });
         
         var host = builder.Build();
+
+        // Start the host to ensure OpenTelemetry is initialized
+        await host.StartAsync();
+
+        // Add a simple ActivitySource listener for debugging
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = _ => true,
+            Sample = (ref ActivityCreationOptions<ActivityContext> options) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStarted = activity => Console.WriteLine($"📍 Activity Started: {activity.DisplayName} - TraceId: {activity.TraceId}"),
+            ActivityStopped = activity => Console.WriteLine($"✅ Activity Stopped: {activity.DisplayName} - Duration: {activity.Duration.TotalMilliseconds}ms")
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        // Verify ActivitySource is working
+        using (var testActivity = ActivitySource.StartActivity("Test Activity", ActivityKind.Internal))
+        {
+            Console.WriteLine($"🔍 ActivitySource test - Activity created: {testActivity != null}");
+            if (testActivity != null)
+            {
+                Console.WriteLine($"   TraceId: {testActivity.TraceId}");
+                Console.WriteLine($"   SpanId: {testActivity.SpanId}");
+            }
+        }
 
         using var scope = host.Services.CreateScope();
         var services = scope.ServiceProvider;
@@ -142,27 +181,94 @@ public class Program
 
     private static async Task PingAsync(HttpClient client, string path, string name, ILogger logger, CancellationToken ct)
     {
-        using var activity = ActivitySource.StartActivity($"ping {name}", ActivityKind.Client);
-        activity?.SetTag("test.suite", "e2e");
-        activity?.SetTag("test.name", $"ping_{name}");
+        // Force create a new trace by setting Activity.Current to null first
+        Activity.Current = null;
+        
+        // Start a new root activity for each ping to ensure it creates a new trace
+        using var activity = ActivitySource.StartActivity(
+            $"E2E Health Check: {name}", 
+            ActivityKind.Client,
+            parentContext: default,  // No parent = new root trace
+            tags: new Dictionary<string, object?>
+            {
+                ["test.suite"] = "e2e-health-check",
+                ["test.name"] = $"ping_{name}",
+                ["test.target"] = name,
+                ["test.endpoint"] = path,
+                ["test.type"] = "health-check",
+                ["service.name"] = "MedicineTrack.End2EndTests.Runner",
+                ["otel.status_code"] = "OK"
+            }) ?? Activity.Current;
+        
+        // If still no activity, force create one
+        Activity? finalActivity = activity;
+        bool createdManually = false;
+        if (finalActivity == null)
+        {
+            // Manually create an activity as a fallback
+            finalActivity = new Activity($"E2E Health Check: {name}");
+            finalActivity.SetIdFormat(ActivityIdFormat.W3C);
+            finalActivity.Start();
+            createdManually = true;
+            logger.LogDebug("📍 Manually created activity - TraceId: {TraceId}", finalActivity.TraceId.ToString());
+        }
 
         try
         {
+            // Add baggage that will be propagated to downstream services
+            finalActivity?.AddBaggage("test.runner", "e2e");
+            finalActivity?.AddBaggage("test.run.id", Guid.NewGuid().ToString("N"));
+            
+            var startTime = DateTimeOffset.UtcNow;
+            finalActivity?.AddEvent(new ActivityEvent("health_check_started", startTime));
+            
             var resp = await client.GetAsync(path, ct);
-            activity?.SetTag("http.status_code", (int)resp.StatusCode);
+            
+            var endTime = DateTimeOffset.UtcNow;
+            var duration = endTime - startTime;
+            
+            // Set standard HTTP semantic conventions
+            finalActivity?.SetTag("http.method", "GET");
+            finalActivity?.SetTag("http.url", $"{client.BaseAddress}{path}");
+            finalActivity?.SetTag("http.status_code", (int)resp.StatusCode);
+            finalActivity?.SetTag("http.response.status_code", (int)resp.StatusCode);
+            finalActivity?.SetTag("test.duration_ms", duration.TotalMilliseconds);
+            
             if (!resp.IsSuccessStatusCode)
             {
-                logger.LogWarning("{Name} health: {Status}", name, resp.StatusCode);
+                finalActivity?.SetStatus(ActivityStatusCode.Error, $"Health check failed with status {resp.StatusCode}");
+                finalActivity?.AddEvent(new ActivityEvent("health_check_failed", endTime, 
+                    new ActivityTagsCollection {{ "status_code", (int)resp.StatusCode }}));
+                logger.LogWarning("[{TraceId}] {Name} health check failed: {Status}", 
+                    finalActivity?.TraceId.ToString() ?? "no-trace", name, resp.StatusCode);
             }
             else
             {
-                logger.LogDebug("{Name} health OK", name);
+                finalActivity?.SetStatus(ActivityStatusCode.Ok, "Health check succeeded");
+                finalActivity?.AddEvent(new ActivityEvent("health_check_succeeded", endTime));
+                logger.LogInformation("[{TraceId}] {Name} health check OK (duration: {Duration:F2}ms)", 
+                    finalActivity?.TraceId.ToString() ?? "no-trace", name, duration.TotalMilliseconds);
             }
         }
         catch (Exception ex)
         {
-            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
-            logger.LogWarning(ex, "{Name} health ping failed", name);
+            finalActivity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            finalActivity?.RecordException(ex);
+            finalActivity?.AddEvent(new ActivityEvent("health_check_exception", 
+                DateTimeOffset.UtcNow, 
+                new ActivityTagsCollection {{ "exception.type", ex.GetType().Name }, { "exception.message", ex.Message }}));
+            
+            logger.LogWarning(ex, "[{TraceId}] {Name} health ping failed with exception", 
+                finalActivity?.TraceId.ToString() ?? "no-trace", name);
+        }
+        finally
+        {
+            // If we manually created the activity, we need to stop it
+            if (createdManually && finalActivity != null)
+            {
+                finalActivity.Stop();
+                finalActivity.Dispose();
+            }
         }
     }
 
