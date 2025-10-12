@@ -8,6 +8,8 @@ using MedicineTrack.Configuration.Data.Models;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Trace;
 using Npgsql;
+using FluentValidation;
+using MedicineTrack.Api.Validators;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,6 +43,8 @@ builder.Services.AddOpenApi();
 builder.Services.AddMedicineTrackServices();
 builder.Services.AddMedicineTrackLogging();
 
+builder.Services.AddValidatorsFromAssemblyContaining<CreateMedicationRequestValidator>();
+
 // In a real application, you would add services for database context, authentication, etc.
 // builder.Services.AddDbContext<AppDbContext>(options => ...);
 // builder.Services.AddAuthentication(...);
@@ -66,8 +70,14 @@ var baseApiRoute = "";
 // --- Medication Management Endpoints ---
 var medicationsGroup = app.MapGroup($"{baseApiRoute}/users/{{userId:guid}}/medications").WithTags("Medications");
 
-medicationsGroup.MapPost("/", (Guid userId, [FromBody] CreateMedicationRequest req) =>
+medicationsGroup.MapPost("/", async (Guid userId, [FromBody] CreateMedicationRequest req, IValidator<CreateMedicationRequest> validator) =>
 {
+    var validationResult = await validator.ValidateAsync(req);
+    if (!validationResult.IsValid)
+    {
+        return Results.ValidationProblem(validationResult.ToDictionary());
+    }
+
     // Placeholder: In a real app, save to DB, generate IDs for medication and schedules
     var newSchedules = req.Schedules.Select(s => new Schedule(
         Guid.NewGuid(), s.FrequencyType, s.Interval, s.DaysOfWeek, s.TimesOfDay, s.Quantity, s.Unit
@@ -111,7 +121,7 @@ medicationsGroup.MapGet("/", (Guid userId, string? status, string? search) =>
             GenericName = "Lisinopril",
             BrandName = "Zestril",
             Strength = "10 mg",
-            Form = "Tablet",
+            Form = MedicationForm.Tablet,
             Shape = "Round",
             Color = "White",
             Notes = "Take with water",
@@ -139,7 +149,7 @@ medicationsGroup.MapGet("/{medicationId:guid}", (Guid userId, Guid medicationId)
         GenericName = "Lisinopril",
         BrandName = "Zestril",
         Strength = "10 mg",
-        Form = "Tablet",
+        Form = MedicationForm.Tablet,
         Shape = "Round",
         Color = "White",
         Notes = "Take with water",
@@ -168,7 +178,7 @@ medicationsGroup.MapPut("/{medicationId:guid}", (Guid userId, Guid medicationId,
         GenericName = req.GenericName,
         BrandName = req.BrandName,
         Strength = req.Strength ?? "10mg",
-        Form = req.Form ?? "Tablet",
+        Form = req.Form ?? MedicationForm.Tablet,
         Shape = req.Shape,
         Color = req.Color,
         Notes = req.Notes,
