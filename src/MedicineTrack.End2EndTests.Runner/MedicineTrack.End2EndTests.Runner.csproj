@@ -6,8 +6,10 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <AssemblyName>MedicineTrack.End2EndTests.Runner</AssemblyName>
-        <!-- Disable xUnit auto-generated entry point since this is a runner, not a test project -->
+        <!-- Prevent xUnit from test project from generating entry point -->
         <GenerateProgramFile>false</GenerateProgramFile>
+        <GenerateTestingPlatformEntryPoint>false</GenerateTestingPlatformEntryPoint>
+        <IsTestProject>false</IsTestProject>
     </PropertyGroup>
 
     <ItemGroup>
@@ -26,13 +28,22 @@
         <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.12.0" />
         <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.12.0" />
         <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.9.0" />
-        <!-- xUnit for programmatic test execution -->
-        <PackageReference Include="xunit" Version="2.9.3" />
-        <PackageReference Include="xunit.runner.utility" Version="2.9.3" />
     </ItemGroup>
 
     <ItemGroup>
-        <!-- Reference to actual test project -->
-        <ProjectReference Include="..\MedicineTrack.End2EndTests\MedicineTrack.End2EndTests.csproj" />
+        <!-- Reference to actual test project - exclude test SDK to prevent entry point conflicts -->
+        <ProjectReference Include="..\MedicineTrack.End2EndTests\MedicineTrack.End2EndTests.csproj">
+            <ExcludeAssets>build</ExcludeAssets>
+        </ProjectReference>
+    </ItemGroup>
+
+    <!-- Exclude xUnit analyzers and build targets that generate entry points -->
+    <ItemGroup>
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1">
+            <ExcludeAssets>all</ExcludeAssets>
+        </PackageReference>
+        <PackageReference Include="xunit.v3" Version="3.0.0">
+            <ExcludeAssets>build</ExcludeAssets>
+        </PackageReference>
     </ItemGroup>
 </Project>
