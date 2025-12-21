@@ -21,7 +21,6 @@ public class Program
     public static async Task Main(string[] args)
     {
         var options = ParseArgs(args);
-        var runTests = args.Contains("--run-tests");
 
         var builder = Host.CreateDefaultBuilder(args)
             .ConfigureLogging(logging =>
@@ -198,49 +197,87 @@ public class Program
             return;
         }
 
-        // Run E2E tests if requested
-        if (runTests)
+        // Get the test executor
+        var testExecutor = services.GetRequiredService<TestExecutor>();
+
+        // Run tests on startup if configured
+        if (options.RunOnStartup)
         {
-            logger.LogInformation("🧪 Running E2E tests...");
-            var testExecutor = services.GetRequiredService<TestExecutor>();
+            logger.LogInformation("🧪 Running initial E2E test suite...");
             var result = await testExecutor.RunTestsAsync(cts.Token);
-
-            if (!result.Success)
-            {
-                logger.LogError("❌ E2E tests failed! {Failed}/{Total} tests failed.", result.Failed, result.TotalTests);
-                Environment.ExitCode = 1;
-            }
-            else
-            {
-                logger.LogInformation("✅ All E2E tests passed! {Passed}/{Total}", result.Passed, result.TotalTests);
-            }
-
-            // Exit after tests complete (don't continue with health pings)
-            logger.LogInformation("✅ Test run complete. Exiting.");
-            return;
+            LogTestResult(logger, result);
         }
 
-        // Otherwise, continue with health pings
-        logger.LogInformation("📡 Starting continuous health pings (1s interval)...");
-        var periodicTimer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        // Schedule periodic test runs and health pings
+        var testInterval = options.Interval;
+        var healthPingInterval = TimeSpan.FromSeconds(5);
+
+        logger.LogInformation("📅 Scheduled: E2E tests every {TestInterval}, health pings every {HealthInterval}",
+            testInterval, healthPingInterval);
+
+        var lastTestRun = DateTimeOffset.UtcNow;
+        var testRunCount = options.RunOnStartup ? 1 : 0;
+
         try
         {
-            while (await periodicTimer.WaitForNextTickAsync(cts.Token))
-            {
-                _ = PingAsync(httpGatewayService, "/health", "gateway", logger, cts.Token);
-                _ = PingAsync(httpGatewayService, "/medicines/health", "gateway->api", logger, cts.Token);
-                _ = PingAsync(httpGatewayService, "/configs/health", "gateway->config", logger, cts.Token);
+            var healthTimer = new PeriodicTimer(healthPingInterval);
 
+            while (await healthTimer.WaitForNextTickAsync(cts.Token))
+            {
+                // Run health pings
+                _ = PingAsync(httpGatewayService, "/health", "gateway", logger, cts.Token);
                 _ = PingAsync(httpApiService, "/health", "api", logger, cts.Token);
                 _ = PingAsync(httpConfigService, "/health", "config", logger, cts.Token);
+
+                // Check if it's time to run tests
+                var timeSinceLastTest = DateTimeOffset.UtcNow - lastTestRun;
+                if (timeSinceLastTest >= testInterval)
+                {
+                    // Check if we've reached max runs
+                    if (options.MaxRuns.HasValue && testRunCount >= options.MaxRuns.Value)
+                    {
+                        logger.LogInformation("🏁 Reached maximum test runs ({MaxRuns}). Continuing with health pings only.", options.MaxRuns);
+                        continue;
+                    }
+
+                    testRunCount++;
+                    logger.LogInformation("🧪 Running scheduled E2E test suite (run #{RunCount})...", testRunCount);
+
+                    var result = await testExecutor.RunTestsAsync(cts.Token);
+                    LogTestResult(logger, result);
+
+                    lastTestRun = DateTimeOffset.UtcNow;
+
+                    var nextTestRun = lastTestRun + testInterval;
+                    logger.LogInformation("⏰ Next test run scheduled at: {NextRun:HH:mm:ss}", nextTestRun);
+                }
             }
         }
         catch (OperationCanceledException)
         {
-            logger.LogInformation("🛑 Cancellation requested. Stopping health pings...");
+            logger.LogInformation("🛑 Cancellation requested. Stopping...");
         }
 
-        logger.LogInformation("✅ Runner exited cleanly.");
+        logger.LogInformation("✅ Runner exited cleanly. Total test runs: {TotalRuns}", testRunCount);
+    }
+
+    private static void LogTestResult(ILogger logger, TestRunResult result)
+    {
+        if (result.Success)
+        {
+            logger.LogInformation("✅ Test run passed: {Passed}/{Total} tests in {Duration:F1}s",
+                result.Passed, result.TotalTests, result.Duration.TotalSeconds);
+        }
+        else
+        {
+            logger.LogError("❌ Test run failed: {Passed}/{Total} passed, {Failed} failed in {Duration:F1}s",
+                result.Passed, result.TotalTests, result.Failed, result.Duration.TotalSeconds);
+
+            foreach (var failedTest in result.FailedTests)
+            {
+                logger.LogError("   ❌ {TestName}", failedTest);
+            }
+        }
     }
 
     private static async Task PingAsync(HttpClient client, string path, string name, ILogger logger, CancellationToken ct)

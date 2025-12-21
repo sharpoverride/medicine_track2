@@ -7,9 +7,24 @@ namespace MedicineTrack.End2EndTests.Runner.Scheduling;
 
 public class TestSchedulerOptions
 {
-    public TimeSpan Interval { get; set; } = TimeSpan.FromMinutes(10);
+    /// <summary>
+    /// Interval between test runs. Default: 5 minutes.
+    /// </summary>
+    public TimeSpan Interval { get; set; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// Maximum number of test runs. Null = unlimited.
+    /// </summary>
     public int? MaxRuns { get; set; } = null;
+
+    /// <summary>
+    /// Whether to run tests immediately on startup. Default: true.
+    /// </summary>
     public bool RunOnStartup { get; set; } = true;
+
+    /// <summary>
+    /// Optional test name filters (not yet implemented).
+    /// </summary>
     public string[] TestFilters { get; set; } = Array.Empty<string>();
 }
 
