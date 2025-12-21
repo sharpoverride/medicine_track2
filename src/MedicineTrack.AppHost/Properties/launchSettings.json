@@ -22,7 +22,8 @@
         "ASPNETCORE_ENVIRONMENT": "Development",
         "DOTNET_ENVIRONMENT": "Development",
         "DOTNET_DASHBOARD_OTLP_ENDPOINT_URL": "http://localhost:19279",
-        "DOTNET_RESOURCE_SERVICE_ENDPOINT_URL": "http://localhost:20265"
+        "DOTNET_RESOURCE_SERVICE_ENDPOINT_URL": "http://localhost:20265",
+        "ASPIRE_ALLOW_UNSECURED_TRANSPORT": "true"
       }
     }
   }
