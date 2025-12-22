@@ -8,7 +8,7 @@ public class Medication
     public string? GenericName { get; set; }
     public string? BrandName { get; set; }
     public string Strength { get; set; } = null!;
-    public string Form { get; set; } = null!;
+    public MedicationForm Form { get; set; }
     public string? Shape { get; set; }
     public string? Color { get; set; }
     public string? Notes { get; set; }

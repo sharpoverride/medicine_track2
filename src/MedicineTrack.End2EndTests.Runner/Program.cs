@@ -1,5 +1,6 @@
 using MedicineTrack.End2EndTests.Runner.Scheduling;
 using MedicineTrack.End2EndTests.Runner.Telemetry;
+using MedicineTrack.End2EndTests.Fixtures;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -109,9 +110,12 @@ public class Program
 
                 // Register services
                 services.AddSingleton(options);
+                services.AddSingleton(ActivitySource);
 
-                // Add test fixtures and other services from the test assembly
-                // services.AddSingleton<Fixtures.SystemUserFixture>();
+                // Add test fixtures for E2E tests
+                // TestServicesFixture provides services for test classes using the runner's DI container
+                services.AddSingleton<TestServicesFixture>();
+                services.AddSingleton<TestExecutor>();
             })
             .ConfigureLogging((hostingContext, logging) =>
             {
@@ -153,30 +157,141 @@ public class Program
         var httpApiService = services.GetRequiredService<IHttpClientFactory>().CreateClient("medicine-track-api");
         var httpConfigService = services.GetRequiredService<IHttpClientFactory>().CreateClient("medicine-track-config");
 
-        logger.LogInformation("🚀 MedicineTrack E2E Runner initialized. Starting 1s health pings for gateway/api/config...");
+        logger.LogInformation("🚀 MedicineTrack E2E Runner initialized.");
         using var cts = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 
-        // Periodically ping health endpoints every second
-        var periodicTimer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        // Wait for services to be healthy before running tests
+        logger.LogInformation("⏳ Waiting for services to be healthy...");
+        var maxWaitTime = TimeSpan.FromMinutes(2);
+        var startWait = DateTimeOffset.UtcNow;
+        var servicesHealthy = false;
+
+        while (!servicesHealthy && DateTimeOffset.UtcNow - startWait < maxWaitTime && !cts.Token.IsCancellationRequested)
+        {
+            try
+            {
+                var apiHealth = await httpApiService.GetAsync("/health", cts.Token);
+                var configHealth = await httpConfigService.GetAsync("/health", cts.Token);
+
+                if (apiHealth.IsSuccessStatusCode && configHealth.IsSuccessStatusCode)
+                {
+                    servicesHealthy = true;
+                    logger.LogInformation("✅ All services are healthy!");
+                }
+                else
+                {
+                    logger.LogDebug("Services not ready yet, retrying in 2s...");
+                    await Task.Delay(2000, cts.Token);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogDebug(ex, "Health check failed, retrying in 2s...");
+                await Task.Delay(2000, cts.Token);
+            }
+        }
+
+        if (!servicesHealthy)
+        {
+            logger.LogError("❌ Services did not become healthy within {Timeout}. Exiting.", maxWaitTime);
+            return;
+        }
+
+        // Initialize TestServicesFixture (creates organization and system user)
+        logger.LogInformation("🔧 Initializing test fixtures...");
+        var testServicesFixture = services.GetRequiredService<TestServicesFixture>();
+        var httpClientFactory = services.GetRequiredService<IHttpClientFactory>();
+        var loggerFactory = services.GetRequiredService<ILoggerFactory>();
+        testServicesFixture.ConfigureExternalServices(httpClientFactory, loggerFactory);
+        await testServicesFixture.InitializeAsync();
+        logger.LogInformation("✅ Test fixtures initialized");
+
+        // Get the test executor
+        var testExecutor = services.GetRequiredService<TestExecutor>();
+
+        // Run tests on startup if configured
+        if (options.RunOnStartup)
+        {
+            logger.LogInformation("🧪 Running initial E2E test suite...");
+            var result = await testExecutor.RunTestsAsync(cts.Token);
+            LogTestResult(logger, result);
+        }
+
+        // Schedule periodic test runs and health pings
+        var testInterval = options.Interval;
+        var healthPingInterval = TimeSpan.FromSeconds(5);
+
+        logger.LogInformation("📅 Scheduled: E2E tests every {TestInterval}, health pings every {HealthInterval}",
+            testInterval, healthPingInterval);
+
+        var lastTestRun = DateTimeOffset.UtcNow;
+        var testRunCount = options.RunOnStartup ? 1 : 0;
+
         try
         {
-            while (await periodicTimer.WaitForNextTickAsync(cts.Token))
-            {
-                _ = PingAsync(httpGatewayService, "/health", "gateway", logger, cts.Token);
-                _ = PingAsync(httpGatewayService, "/medicines/health", "gateway->api", logger, cts.Token);
-                _ = PingAsync(httpGatewayService, "/configs/health", "gateway->config", logger, cts.Token);
+            var healthTimer = new PeriodicTimer(healthPingInterval);
 
+            while (await healthTimer.WaitForNextTickAsync(cts.Token))
+            {
+                // Run health pings
+                _ = PingAsync(httpGatewayService, "/health", "gateway", logger, cts.Token);
                 _ = PingAsync(httpApiService, "/health", "api", logger, cts.Token);
                 _ = PingAsync(httpConfigService, "/health", "config", logger, cts.Token);
+
+                // Check if it's time to run tests
+                var timeSinceLastTest = DateTimeOffset.UtcNow - lastTestRun;
+                if (timeSinceLastTest >= testInterval)
+                {
+                    // Check if we've reached max runs
+                    if (options.MaxRuns.HasValue && testRunCount >= options.MaxRuns.Value)
+                    {
+                        logger.LogInformation("🏁 Reached maximum test runs ({MaxRuns}). Continuing with health pings only.", options.MaxRuns);
+                        continue;
+                    }
+
+                    testRunCount++;
+                    logger.LogInformation("🧪 Running scheduled E2E test suite (run #{RunCount})...", testRunCount);
+
+                    var result = await testExecutor.RunTestsAsync(cts.Token);
+                    LogTestResult(logger, result);
+
+                    lastTestRun = DateTimeOffset.UtcNow;
+
+                    var nextTestRun = lastTestRun + testInterval;
+                    logger.LogInformation("⏰ Next test run scheduled at: {NextRun:HH:mm:ss}", nextTestRun);
+                }
             }
         }
         catch (OperationCanceledException)
         {
-            logger.LogInformation("🛑 Cancellation requested. Stopping health pings...");
+            logger.LogInformation("🛑 Cancellation requested. Stopping...");
         }
 
-        logger.LogInformation("✅ Runner exited cleanly.");
+        // Cleanup test fixtures
+        logger.LogInformation("🧹 Cleaning up test fixtures...");
+        await testServicesFixture.DisposeAsync();
+
+        logger.LogInformation("✅ Runner exited cleanly. Total test runs: {TotalRuns}", testRunCount);
+    }
+
+    private static void LogTestResult(ILogger logger, TestRunResult result)
+    {
+        if (result.Success)
+        {
+            logger.LogInformation("✅ Test run passed: {Passed}/{Total} tests in {Duration:F1}s",
+                result.Passed, result.TotalTests, result.Duration.TotalSeconds);
+        }
+        else
+        {
+            logger.LogError("❌ Test run failed: {Passed}/{Total} passed, {Failed} failed in {Duration:F1}s",
+                result.Passed, result.TotalTests, result.Failed, result.Duration.TotalSeconds);
+
+            foreach (var failedTest in result.FailedTests)
+            {
+                logger.LogError("   ❌ {TestName}", failedTest);
+            }
+        }
     }
 
     private static async Task PingAsync(HttpClient client, string path, string name, ILogger logger, CancellationToken ct)
@@ -253,7 +368,7 @@ public class Program
         catch (Exception ex)
         {
             finalActivity?.SetStatus(ActivityStatusCode.Error, ex.Message);
-            finalActivity?.RecordException(ex);
+            finalActivity?.AddException(ex);
             finalActivity?.AddEvent(new ActivityEvent("health_check_exception", 
                 DateTimeOffset.UtcNow, 
                 new ActivityTagsCollection {{ "exception.type", ex.GetType().Name }, { "exception.message", ex.Message }}));
@@ -299,9 +414,72 @@ public class Program
                 case "--no-startup":
                     options.RunOnStartup = false;
                     break;
+
+                case "--individual":
+                    // Run tests individually with delay between each test
+                    options.RunTestsIndividually = true;
+                    break;
+
+                case "--test-cadence" when i + 1 < args.Length:
+                    // Cadence between individual tests (in seconds)
+                    if (int.TryParse(args[i + 1], out int cadenceSeconds))
+                    {
+                        options.IndividualTestCadence = TimeSpan.FromSeconds(cadenceSeconds);
+                    }
+                    i++;
+                    break;
+
+                case "--test-cadence-minutes" when i + 1 < args.Length:
+                    // Cadence between individual tests (in minutes)
+                    if (int.TryParse(args[i + 1], out int cadenceMinutes))
+                    {
+                        options.IndividualTestCadence = TimeSpan.FromMinutes(cadenceMinutes);
+                    }
+                    i++;
+                    break;
+
+                case "--initial-delay" when i + 1 < args.Length:
+                    // Initial delay before first test (in seconds)
+                    if (int.TryParse(args[i + 1], out int delaySeconds))
+                    {
+                        options.InitialDelay = TimeSpan.FromSeconds(delaySeconds);
+                    }
+                    i++;
+                    break;
             }
         }
 
         return options;
+    }
+
+    private static void PrintUsage()
+    {
+        Console.WriteLine(@"
+MedicineTrack E2E Test Runner
+
+Usage: MedicineTrack.End2EndTests.Runner [options]
+
+Options:
+  --runs <count>              Maximum number of test suite runs (default: unlimited)
+  --interval <minutes>        Interval between test suite runs (default: 5 minutes)
+  --no-startup                Don't run tests on startup, wait for first interval
+  --individual                Run tests individually with delay between each test
+  --test-cadence <seconds>    Delay between individual tests in seconds (default: 600 = 10 min)
+  --test-cadence-minutes <m>  Delay between individual tests in minutes (default: 10)
+  --initial-delay <seconds>   Delay before starting first test (default: 1 second)
+
+Examples:
+  # Run tests in batch mode every 5 minutes
+  dotnet run
+
+  # Run tests individually with 10 minute cadence
+  dotnet run -- --individual
+
+  # Run tests individually with 30 second cadence
+  dotnet run -- --individual --test-cadence 30
+
+  # Run tests individually with 5 minute cadence and 10 second initial delay
+  dotnet run -- --individual --test-cadence-minutes 5 --initial-delay 10
+");
     }
 }

@@ -1,11 +1,17 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <TargetFramework>net9.0</TargetFramework>
+        <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <AssemblyName>MedicineTrack.End2EndTests.Runner</AssemblyName>
+        <!-- Prevent any test framework from generating entry points -->
+        <GenerateProgramFile>false</GenerateProgramFile>
+        <GenerateTestingPlatformEntryPoint>false</GenerateTestingPlatformEntryPoint>
+        <IsTestProject>false</IsTestProject>
+        <EnableMSTestRunner>false</EnableMSTestRunner>
+        <UseAppHost>true</UseAppHost>
     </PropertyGroup>
 
     <ItemGroup>
@@ -19,10 +25,42 @@
         <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.8" />
         <PackageReference Include="System.Text.Json" Version="9.0.8" />
         <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="9.7.0" />
-        <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.9.0" />
-        <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.9.0" />
-        <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.9.0" />
-        <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.9.0" />
+        <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.12.0" />
+        <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.12.0" />
+        <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.12.0" />
+        <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.12.0" />
         <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.9.0" />
     </ItemGroup>
+
+    <ItemGroup>
+        <!-- Reference test project - exclude build-time assets that generate entry points -->
+        <ProjectReference Include="..\MedicineTrack.End2EndTests\MedicineTrack.End2EndTests.csproj">
+            <Private>true</Private>
+            <ExcludeAssets>buildtransitive;build;analyzers</ExcludeAssets>
+        </ProjectReference>
+    </ItemGroup>
+
+    <!-- Explicitly block test runner packages from generating entry points -->
+    <ItemGroup>
+        <PackageReference Include="xunit.v3" Version="3.0.0" ExcludeAssets="build;buildTransitive;analyzers" PrivateAssets="all" />
+        <PackageReference Include="xunit.runner.visualstudio" Version="3.1.3" ExcludeAssets="all" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" ExcludeAssets="all" PrivateAssets="all" />
+    </ItemGroup>
+
+    <!-- Remove ONLY the xUnit runner/entry point DLLs after build, keep assertion DLLs -->
+    <Target Name="RemoveXunitRunnerFromOutput" AfterTargets="Build">
+        <ItemGroup>
+            <!-- Remove runner DLLs that contain entry point logic -->
+            <RunnerFilesToDelete Include="$(OutputPath)xunit.v3.runner.*.dll" />
+            <RunnerFilesToDelete Include="$(OutputPath)xunit.runner.*.dll" />
+            <RunnerFilesToDelete Include="$(OutputPath)testhost*.dll" />
+            <RunnerFilesToDelete Include="$(OutputPath)Microsoft.Testing*.dll" />
+            <RunnerFilesToDelete Include="$(OutputPath)Microsoft.TestPlatform*.dll" />
+            <RunnerFilesToDelete Include="$(OutputPath)Microsoft.VisualStudio.TestPlatform*.dll" />
+            <RunnerFilesToDelete Include="$(OutputPath)Microsoft.VisualStudio.CodeCoverage*.dll" />
+        </ItemGroup>
+        <Delete Files="@(RunnerFilesToDelete)" />
+        <Message Importance="high" Text="Removed xUnit runner DLLs from output to prevent entry point conflict" />
+    </Target>
+
 </Project>

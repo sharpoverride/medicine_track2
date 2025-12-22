@@ -7,10 +7,45 @@ namespace MedicineTrack.End2EndTests.Runner.Scheduling;
 
 public class TestSchedulerOptions
 {
-    public TimeSpan Interval { get; set; } = TimeSpan.FromMinutes(10);
+    /// <summary>
+    /// Interval between full test suite runs. Default: 5 minutes.
+    /// </summary>
+    public TimeSpan Interval { get; set; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// Maximum number of test runs. Null = unlimited.
+    /// </summary>
     public int? MaxRuns { get; set; } = null;
+
+    /// <summary>
+    /// Whether to run tests immediately on startup. Default: true.
+    /// </summary>
     public bool RunOnStartup { get; set; } = true;
+
+    /// <summary>
+    /// Optional test name filters (not yet implemented).
+    /// </summary>
     public string[] TestFilters { get; set; } = Array.Empty<string>();
+
+    /// <summary>
+    /// Whether to run tests individually with a delay between each test.
+    /// When true, tests run one at a time with IndividualTestCadence delay between them.
+    /// When false, all tests run in sequence without delays.
+    /// Default: false.
+    /// </summary>
+    public bool RunTestsIndividually { get; set; } = false;
+
+    /// <summary>
+    /// Interval between individual tests when RunTestsIndividually is true.
+    /// Default: 10 minutes.
+    /// </summary>
+    public TimeSpan IndividualTestCadence { get; set; } = TimeSpan.FromMinutes(10);
+
+    /// <summary>
+    /// Delay before running the first test (useful for waiting for services to stabilize).
+    /// Default: 1 second.
+    /// </summary>
+    public TimeSpan InitialDelay { get; set; } = TimeSpan.FromSeconds(1);
 }
 
 public class TestScheduler

@@ -28,7 +28,7 @@ public class MedicationDbContext : DbContext
             entity.Property(e => e.GenericName).HasMaxLength(200);
             entity.Property(e => e.BrandName).HasMaxLength(200);
             entity.Property(e => e.Strength).IsRequired().HasMaxLength(50);
-            entity.Property(e => e.Form).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.Form).IsRequired().HasMaxLength(50).HasConversion<string>();
             entity.Property(e => e.Shape).HasMaxLength(50);
             entity.Property(e => e.Color).HasMaxLength(50);
             entity.Property(e => e.Notes).HasMaxLength(1000);

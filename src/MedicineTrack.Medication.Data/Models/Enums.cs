@@ -26,3 +26,21 @@ public enum InteractionSeverity
     LOW, 
     UNKNOWN 
 }
+
+public enum MedicationForm
+{
+    Tablet,
+    Capsule,
+    Liquid,
+    Injection,
+    Patch,
+    Ointment,
+    Cream,
+    Gel,
+    Inhaler,
+    Spray,
+    Drops,
+    Suppository,
+    Powder,
+    Other
+}
