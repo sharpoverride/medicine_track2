@@ -113,7 +113,8 @@ public class Program
                 services.AddSingleton(ActivitySource);
 
                 // Add test fixtures for E2E tests
-                services.AddSingleton<SystemUserFixture>();
+                // TestServicesFixture provides services for test classes using the runner's DI container
+                services.AddSingleton<TestServicesFixture>();
                 services.AddSingleton<TestExecutor>();
             })
             .ConfigureLogging((hostingContext, logging) =>
@@ -197,6 +198,15 @@ public class Program
             return;
         }
 
+        // Initialize TestServicesFixture (creates organization and system user)
+        logger.LogInformation("🔧 Initializing test fixtures...");
+        var testServicesFixture = services.GetRequiredService<TestServicesFixture>();
+        var httpClientFactory = services.GetRequiredService<IHttpClientFactory>();
+        var loggerFactory = services.GetRequiredService<ILoggerFactory>();
+        testServicesFixture.ConfigureExternalServices(httpClientFactory, loggerFactory);
+        await testServicesFixture.InitializeAsync();
+        logger.LogInformation("✅ Test fixtures initialized");
+
         // Get the test executor
         var testExecutor = services.GetRequiredService<TestExecutor>();
 
@@ -257,6 +267,10 @@ public class Program
         {
             logger.LogInformation("🛑 Cancellation requested. Stopping...");
         }
+
+        // Cleanup test fixtures
+        logger.LogInformation("🧹 Cleaning up test fixtures...");
+        await testServicesFixture.DisposeAsync();
 
         logger.LogInformation("✅ Runner exited cleanly. Total test runs: {TotalRuns}", testRunCount);
     }
@@ -400,9 +414,72 @@ public class Program
                 case "--no-startup":
                     options.RunOnStartup = false;
                     break;
+
+                case "--individual":
+                    // Run tests individually with delay between each test
+                    options.RunTestsIndividually = true;
+                    break;
+
+                case "--test-cadence" when i + 1 < args.Length:
+                    // Cadence between individual tests (in seconds)
+                    if (int.TryParse(args[i + 1], out int cadenceSeconds))
+                    {
+                        options.IndividualTestCadence = TimeSpan.FromSeconds(cadenceSeconds);
+                    }
+                    i++;
+                    break;
+
+                case "--test-cadence-minutes" when i + 1 < args.Length:
+                    // Cadence between individual tests (in minutes)
+                    if (int.TryParse(args[i + 1], out int cadenceMinutes))
+                    {
+                        options.IndividualTestCadence = TimeSpan.FromMinutes(cadenceMinutes);
+                    }
+                    i++;
+                    break;
+
+                case "--initial-delay" when i + 1 < args.Length:
+                    // Initial delay before first test (in seconds)
+                    if (int.TryParse(args[i + 1], out int delaySeconds))
+                    {
+                        options.InitialDelay = TimeSpan.FromSeconds(delaySeconds);
+                    }
+                    i++;
+                    break;
             }
         }
 
         return options;
+    }
+
+    private static void PrintUsage()
+    {
+        Console.WriteLine(@"
+MedicineTrack E2E Test Runner
+
+Usage: MedicineTrack.End2EndTests.Runner [options]
+
+Options:
+  --runs <count>              Maximum number of test suite runs (default: unlimited)
+  --interval <minutes>        Interval between test suite runs (default: 5 minutes)
+  --no-startup                Don't run tests on startup, wait for first interval
+  --individual                Run tests individually with delay between each test
+  --test-cadence <seconds>    Delay between individual tests in seconds (default: 600 = 10 min)
+  --test-cadence-minutes <m>  Delay between individual tests in minutes (default: 10)
+  --initial-delay <seconds>   Delay before starting first test (default: 1 second)
+
+Examples:
+  # Run tests in batch mode every 5 minutes
+  dotnet run
+
+  # Run tests individually with 10 minute cadence
+  dotnet run -- --individual
+
+  # Run tests individually with 30 second cadence
+  dotnet run -- --individual --test-cadence 30
+
+  # Run tests individually with 5 minute cadence and 10 second initial delay
+  dotnet run -- --individual --test-cadence-minutes 5 --initial-delay 10
+");
     }
 }

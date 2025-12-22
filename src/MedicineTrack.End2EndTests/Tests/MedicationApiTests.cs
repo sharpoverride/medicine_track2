@@ -5,37 +5,22 @@ using Xunit;
 
 namespace MedicineTrack.End2EndTests.Tests;
 
-public class MedicationApiTests : IAsyncLifetime
+/// <summary>
+/// E2E tests for the Medication API.
+/// Uses ICollectionFixture for xUnit (Rider/VS) and supports the custom E2E Runner.
+/// </summary>
+[Collection("E2ETests")]
+public class MedicationApiTests
 {
     private readonly HttpClient _medicationHttpClient;
     private readonly SystemUserFixture _systemUserFixture;
     private readonly ILogger<MedicationApiTests> _logger;
 
-    public MedicationApiTests(
-        IHttpClientFactory httpClientFactory,
-        SystemUserFixture systemUserFixture,
-        ILogger<MedicationApiTests> logger)
+    public MedicationApiTests(TestServicesFixture fixture)
     {
-        _medicationHttpClient = httpClientFactory.CreateClient("medicine-track-api");
-        _systemUserFixture = systemUserFixture;
-        _logger = logger;
-    }
-
-    public async ValueTask InitializeAsync()
-    {
-        // SystemUserFixture is already initialized by xUnit when used as IClassFixture
-        // For our custom scheduler, we ensure it's initialized here
-        if (_systemUserFixture.SystemUserId == Guid.Empty)
-        {
-            await _systemUserFixture.InitializeAsync();
-        }
-    }
-
-    public ValueTask DisposeAsync()
-    {
-        // Let xUnit handle disposal when used as IClassFixture
-        // For our custom scheduler, we handle disposal here
-        return ValueTask.CompletedTask;
+        _medicationHttpClient = fixture.HttpClientFactory.CreateClient("medicine-track-api");
+        _systemUserFixture = fixture.SystemUserFixture;
+        _logger = fixture.GetLogger<MedicationApiTests>();
     }
 
     [Fact]
@@ -62,7 +47,7 @@ public class MedicationApiTests : IAsyncLifetime
             Name = "Test Medication",
             GenericName = "TestGeneric",
             BrandName = "TestBrand",
-            Strength = "10mg",
+            Strength = "10 mg",  // Note: space required between number and unit
             Form = "Tablet",
             Shape = "Round",
             Color = "White",
@@ -444,7 +429,7 @@ public class MedicationApiTests : IAsyncLifetime
         var createRequest = new
         {
             Name = "Test Medication",
-            Strength = "invalid", // Invalid format - should be like "10mg"
+            Strength = "invalid", // Invalid format - should be like "10 mg" (with space)
             Form = "Tablet",
             StartDate = DateOnly.FromDateTime(DateTime.UtcNow),
             Schedules = new[]
@@ -478,7 +463,7 @@ public class MedicationApiTests : IAsyncLifetime
         var createRequest = new
         {
             Name = "", // Empty name should fail validation
-            Strength = "10mg",
+            Strength = "10 mg",
             Form = "Tablet",
             StartDate = DateOnly.FromDateTime(DateTime.UtcNow),
             Schedules = new[]
@@ -512,7 +497,7 @@ public class MedicationApiTests : IAsyncLifetime
         var createRequest = new
         {
             Name = "Test Medication",
-            Strength = "10mg",
+            Strength = "10 mg",
             Form = "Tablet",
             StartDate = DateOnly.FromDateTime(DateTime.UtcNow),
             Schedules = Array.Empty<object>() // Empty schedules should fail validation
@@ -537,7 +522,7 @@ public class MedicationApiTests : IAsyncLifetime
         var createRequest = new
         {
             Name = "Test Medication",
-            Strength = "10mg",
+            Strength = "10 mg",
             Form = "Tablet",
             StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(10)),
             EndDate = DateOnly.FromDateTime(DateTime.UtcNow), // End before start

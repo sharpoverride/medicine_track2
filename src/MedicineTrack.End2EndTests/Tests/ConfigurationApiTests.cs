@@ -5,35 +5,22 @@ using Xunit;
 
 namespace MedicineTrack.End2EndTests.Tests;
 
-public class ConfigurationApiTests : IAsyncLifetime
+/// <summary>
+/// E2E tests for the Configuration API.
+/// Uses ICollectionFixture for xUnit (Rider/VS) and supports the custom E2E Runner.
+/// </summary>
+[Collection("E2ETests")]
+public class ConfigurationApiTests
 {
     private readonly HttpClient _configHttpClient;
     private readonly SystemUserFixture _systemUserFixture;
     private readonly ILogger<ConfigurationApiTests> _logger;
 
-    public ConfigurationApiTests(
-        IHttpClientFactory httpClientFactory,
-        SystemUserFixture systemUserFixture,
-        ILogger<ConfigurationApiTests> logger)
+    public ConfigurationApiTests(TestServicesFixture fixture)
     {
-        _configHttpClient = httpClientFactory.CreateClient("medicine-track-config");
-        _systemUserFixture = systemUserFixture;
-        _logger = logger;
-    }
-
-    public async ValueTask InitializeAsync()
-    {
-        // Initialize the SystemUserFixture
-        if (_systemUserFixture.SystemUserId == Guid.Empty)
-        {
-            await _systemUserFixture.InitializeAsync();
-        }
-    }
-
-    public ValueTask DisposeAsync()
-    {
-        // Cleanup handled by DI container
-        return ValueTask.CompletedTask;
+        _configHttpClient = fixture.HttpClientFactory.CreateClient("medicine-track-config");
+        _systemUserFixture = fixture.SystemUserFixture;
+        _logger = fixture.GetLogger<ConfigurationApiTests>();
     }
 
     [Fact]

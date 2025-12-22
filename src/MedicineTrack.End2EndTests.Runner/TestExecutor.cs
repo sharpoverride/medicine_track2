@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
+using MedicineTrack.End2EndTests.Runner.Scheduling;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -15,6 +16,7 @@ public class TestExecutor
     private readonly ILogger<TestExecutor> _logger;
     private readonly IServiceProvider _serviceProvider;
     private readonly ActivitySource _activitySource;
+    private readonly TestSchedulerOptions _options;
 
     // xUnit attribute type names (matched by name to avoid version conflicts)
     private const string FactAttributeName = "Xunit.FactAttribute";
@@ -24,25 +26,48 @@ public class TestExecutor
     public TestExecutor(
         ILogger<TestExecutor> logger,
         IServiceProvider serviceProvider,
-        ActivitySource activitySource)
+        ActivitySource activitySource,
+        TestSchedulerOptions options)
     {
         _logger = logger;
         _serviceProvider = serviceProvider;
         _activitySource = activitySource;
+        _options = options;
     }
 
     public async Task<TestRunResult> RunTestsAsync(CancellationToken cancellationToken = default)
     {
+        // Apply initial delay if configured
+        if (_options.InitialDelay > TimeSpan.Zero)
+        {
+            _logger.LogInformation("⏳ Waiting {Delay} before starting test run...", _options.InitialDelay);
+            await Task.Delay(_options.InitialDelay, cancellationToken);
+        }
+
+        if (_options.RunTestsIndividually)
+        {
+            return await RunTestsIndividuallyAsync(cancellationToken);
+        }
+
+        return await RunTestsBatchAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Runs all tests in batch mode (original behavior).
+    /// </summary>
+    private async Task<TestRunResult> RunTestsBatchAsync(CancellationToken cancellationToken)
+    {
         var runId = Guid.NewGuid().ToString("N");
-        using var runActivity = _activitySource.StartActivity("E2E Test Suite", ActivityKind.Internal);
+        using var runActivity = _activitySource.StartActivity("E2E Test Suite (Batch)", ActivityKind.Internal);
         runActivity?.SetTag("test.type", "e2e");
         runActivity?.SetTag("test.framework", "reflection");
         runActivity?.SetTag("test.run.id", runId);
+        runActivity?.SetTag("test.mode", "batch");
 
         var results = new ConcurrentBag<TestCaseResult>();
         var startTime = DateTimeOffset.UtcNow;
 
-        _logger.LogInformation("🧪 Starting E2E test run {RunId} at {StartTime}", runId, startTime);
+        _logger.LogInformation("🧪 Starting E2E test run (batch mode) {RunId} at {StartTime}", runId, startTime);
 
         try
         {
@@ -70,6 +95,94 @@ public class TestExecutor
             runActivity?.AddException(ex);
         }
 
+        return BuildTestRunResult(results, startTime, runActivity);
+    }
+
+    /// <summary>
+    /// Runs tests individually with configurable delay between each test.
+    /// </summary>
+    private async Task<TestRunResult> RunTestsIndividuallyAsync(CancellationToken cancellationToken)
+    {
+        var runId = Guid.NewGuid().ToString("N");
+        using var runActivity = _activitySource.StartActivity("E2E Test Suite (Individual)", ActivityKind.Internal);
+        runActivity?.SetTag("test.type", "e2e");
+        runActivity?.SetTag("test.framework", "reflection");
+        runActivity?.SetTag("test.run.id", runId);
+        runActivity?.SetTag("test.mode", "individual");
+        runActivity?.SetTag("test.cadence_seconds", _options.IndividualTestCadence.TotalSeconds);
+
+        var results = new ConcurrentBag<TestCaseResult>();
+        var startTime = DateTimeOffset.UtcNow;
+        var testIndex = 0;
+
+        _logger.LogInformation(
+            "🧪 Starting E2E test run (individual mode) {RunId} at {StartTime} with {Cadence} cadence",
+            runId, startTime, _options.IndividualTestCadence);
+
+        try
+        {
+            // Load the test assembly
+            var testAssembly = typeof(MedicineTrack.End2EndTests.Tests.MedicationApiTests).Assembly;
+            _logger.LogInformation("📦 Loading tests from: {AssemblyPath}", testAssembly.Location);
+            runActivity?.SetTag("test.assembly", testAssembly.Location);
+
+            // Discover and flatten all test cases
+            var allTestCases = DiscoverAllTestCases(testAssembly);
+            var totalTests = allTestCases.Count;
+            _logger.LogInformation("🔍 Discovered {Count} test cases", totalTests);
+
+            foreach (var testCase in allTestCases)
+            {
+                if (cancellationToken.IsCancellationRequested) break;
+
+                testIndex++;
+                var nextTestTime = DateTimeOffset.UtcNow.Add(_options.IndividualTestCadence);
+
+                _logger.LogInformation(
+                    "📋 Running test {Index}/{Total}: {TestName}",
+                    testIndex, totalTests, testCase.DisplayName);
+
+                // Execute this single test
+                var result = await ExecuteSingleTestCaseAsync(testCase, runActivity, cancellationToken);
+                results.Add(result);
+
+                // Log next test info if not the last test
+                if (testIndex < totalTests && !cancellationToken.IsCancellationRequested)
+                {
+                    _logger.LogInformation(
+                        "⏰ Next test in {Cadence}. Next test at: {NextTime:HH:mm:ss}",
+                        _options.IndividualTestCadence, nextTestTime);
+
+                    try
+                    {
+                        await Task.Delay(_options.IndividualTestCadence, cancellationToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        _logger.LogInformation("🛑 Test run cancelled");
+                        break;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ Error during test execution");
+            runActivity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            runActivity?.AddException(ex);
+        }
+
+        return BuildTestRunResult(results, startTime, runActivity);
+    }
+
+    /// <summary>
+    /// Builds the final test run result from collected test case results.
+    /// </summary>
+    private TestRunResult BuildTestRunResult(
+        ConcurrentBag<TestCaseResult> results,
+        DateTimeOffset startTime,
+        Activity? runActivity)
+    {
         var endTime = DateTimeOffset.UtcNow;
         var duration = endTime - startTime;
 
@@ -119,6 +232,103 @@ public class TestExecutor
 
         return result;
     }
+
+    /// <summary>
+    /// Discovers all test cases (flattened) including Theory variations.
+    /// </summary>
+    private List<TestCase> DiscoverAllTestCases(Assembly assembly)
+    {
+        var testCases = new List<TestCase>();
+        var testClasses = DiscoverTestClasses(assembly);
+
+        foreach (var testClass in testClasses)
+        {
+            var testMethods = testClass.GetMethods(BindingFlags.Public | BindingFlags.Instance)
+                .Where(IsTestMethod)
+                .ToList();
+
+            foreach (var method in testMethods)
+            {
+                if (IsTheoryMethod(method))
+                {
+                    var inlineDataSets = GetInlineData(method);
+                    if (inlineDataSets.Count == 0)
+                    {
+                        // Skip theories with no data
+                        continue;
+                    }
+
+                    foreach (var data in inlineDataSets)
+                    {
+                        var displayName = $"{testClass.Name}.{method.Name}({string.Join(", ", data.Select(d => d?.ToString() ?? "null"))})";
+                        testCases.Add(new TestCase(testClass, method, displayName, data));
+                    }
+                }
+                else
+                {
+                    var displayName = $"{testClass.Name}.{method.Name}";
+                    testCases.Add(new TestCase(testClass, method, displayName, null));
+                }
+            }
+        }
+
+        return testCases;
+    }
+
+    /// <summary>
+    /// Executes a single test case (creates instance, runs test, disposes).
+    /// </summary>
+    private async Task<TestCaseResult> ExecuteSingleTestCaseAsync(
+        TestCase testCase,
+        Activity? runActivity,
+        CancellationToken cancellationToken)
+    {
+        object? testInstance = null;
+
+        try
+        {
+            // Create instance using DI
+            testInstance = ActivatorUtilities.CreateInstance(_serviceProvider, testCase.TestClass);
+
+            // Call InitializeAsync if present
+            await InvokeLifecycleMethodAsync(testInstance, "InitializeAsync");
+
+            // Execute the test
+            var result = await ExecuteTestMethodAsync(
+                testInstance,
+                testCase.Method,
+                testCase.DisplayName,
+                testCase.Parameters,
+                runActivity,
+                cancellationToken);
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ Error executing test {TestName}", testCase.DisplayName);
+            return new TestCaseResult(testCase.DisplayName, false, TimeSpan.Zero, ex.Message);
+        }
+        finally
+        {
+            // Cleanup
+            if (testInstance != null)
+            {
+                await InvokeLifecycleMethodAsync(testInstance, "DisposeAsync");
+
+                if (testInstance is IAsyncDisposable asyncDisposable)
+                {
+                    await asyncDisposable.DisposeAsync();
+                }
+                else if (testInstance is IDisposable disposable)
+                {
+                    disposable.Dispose();
+                }
+            }
+        }
+    }
+
+    private record TestCase(Type TestClass, MethodInfo Method, string DisplayName, object?[]? Parameters);
 
     private List<Type> DiscoverTestClasses(Assembly assembly)
     {
