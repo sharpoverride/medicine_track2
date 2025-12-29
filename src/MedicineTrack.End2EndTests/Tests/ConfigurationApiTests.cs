@@ -27,12 +27,12 @@ public class ConfigurationApiTests
     public async Task HealthCheck_Should_Return_OK()
     {
         // Act
-        var response = await _configHttpClient.GetAsync("/health");
+        var response = await _configHttpClient.GetAsync("/health", TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var content = await response.Content.ReadAsStringAsync();
-        
+        var content = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
         _logger.LogInformation("Health check response: {Content}", content);
         Assert.Contains("Configuration API is healthy", content);
     }
@@ -41,14 +41,14 @@ public class ConfigurationApiTests
     public async Task GetOrganizations_Should_Return_List()
     {
         // Act
-        var response = await _configHttpClient.GetAsync("/organizations");
+        var response = await _configHttpClient.GetAsync("/organizations", TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var content = await response.Content.ReadAsStringAsync();
-        
+        var content = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
         _logger.LogInformation("Get organizations response: {Content}", content);
-        
+
         // Should return an array
         Assert.StartsWith("[", content.Trim());
         Assert.EndsWith("]", content.Trim());
@@ -60,14 +60,14 @@ public class ConfigurationApiTests
     public async Task GetOrganizations_WithSearch_Should_Return_List(string search)
     {
         // Act
-        var response = await _configHttpClient.GetAsync($"/organizations?search={search}");
+        var response = await _configHttpClient.GetAsync($"/organizations?search={search}", TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var content = await response.Content.ReadAsStringAsync();
-        
+        var content = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
         _logger.LogInformation("Get organizations with search '{Search}' response: {Content}", search, content);
-        
+
         // Should return an array
         Assert.StartsWith("[", content.Trim());
         Assert.EndsWith("]", content.Trim());
@@ -80,14 +80,14 @@ public class ConfigurationApiTests
         var organizationId = _systemUserFixture.OrganizationId;
 
         // Act
-        var response = await _configHttpClient.GetAsync($"/organizations/{organizationId}");
+        var response = await _configHttpClient.GetAsync($"/organizations/{organizationId}", TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var content = await response.Content.ReadAsStringAsync();
-        
+        var content = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
         _logger.LogInformation("Get organization response: {Content}", content);
-        
+
         // Should return an organization object
         Assert.StartsWith("{", content.Trim());
         Assert.EndsWith("}", content.Trim());
@@ -109,14 +109,14 @@ public class ConfigurationApiTests
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         // Act
-        var response = await _configHttpClient.PutAsync($"/organizations/{organizationId}", content);
+        var response = await _configHttpClient.PutAsync($"/organizations/{organizationId}", content, TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var responseContent = await response.Content.ReadAsStringAsync();
-        
+        var responseContent = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
         _logger.LogInformation("Updated organization response: {Content}", responseContent);
-        
+
         // Should return updated organization object
         Assert.StartsWith("{", responseContent.Trim());
         Assert.EndsWith("}", responseContent.Trim());
@@ -129,14 +129,14 @@ public class ConfigurationApiTests
         var organizationId = _systemUserFixture.OrganizationId;
 
         // Act
-        var response = await _configHttpClient.GetAsync($"/organizations/{organizationId}/users");
+        var response = await _configHttpClient.GetAsync($"/organizations/{organizationId}/users", TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var content = await response.Content.ReadAsStringAsync();
-        
+        var content = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
         _logger.LogInformation("Get users response: {Content}", content);
-        
+
         // Should return an array
         Assert.StartsWith("[", content.Trim());
         Assert.EndsWith("]", content.Trim());
@@ -151,14 +151,14 @@ public class ConfigurationApiTests
         var organizationId = _systemUserFixture.OrganizationId;
 
         // Act
-        var response = await _configHttpClient.GetAsync($"/organizations/{organizationId}/users?role={role}");
+        var response = await _configHttpClient.GetAsync($"/organizations/{organizationId}/users?role={role}", TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var content = await response.Content.ReadAsStringAsync();
-        
+        var content = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
         _logger.LogInformation("Get users with role '{Role}' response: {Content}", role, content);
-        
+
         // Should return an array
         Assert.StartsWith("[", content.Trim());
         Assert.EndsWith("]", content.Trim());
@@ -172,14 +172,14 @@ public class ConfigurationApiTests
         var userId = _systemUserFixture.SystemUserId;
 
         // Act
-        var response = await _configHttpClient.GetAsync($"/organizations/{organizationId}/users/{userId}");
+        var response = await _configHttpClient.GetAsync($"/organizations/{organizationId}/users/{userId}", TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var content = await response.Content.ReadAsStringAsync();
-        
+        var content = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
         _logger.LogInformation("Get user response: {Content}", content);
-        
+
         // Should return a user object
         Assert.StartsWith("{", content.Trim());
         Assert.EndsWith("}", content.Trim());
@@ -203,14 +203,14 @@ public class ConfigurationApiTests
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         // Act
-        var response = await _configHttpClient.PutAsync($"/organizations/{organizationId}/users/{userId}", content);
+        var response = await _configHttpClient.PutAsync($"/organizations/{organizationId}/users/{userId}", content, TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var responseContent = await response.Content.ReadAsStringAsync();
-        
+        var responseContent = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
         _logger.LogInformation("Updated user response: {Content}", responseContent);
-        
+
         // Should return updated user object
         Assert.StartsWith("{", responseContent.Trim());
         Assert.EndsWith("}", responseContent.Trim());
@@ -234,12 +234,12 @@ public class ConfigurationApiTests
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         // Act
-        var response = await _configHttpClient.PostAsync($"/organizations/{organizationId}/users", content);
+        var response = await _configHttpClient.PostAsync($"/organizations/{organizationId}/users", content, TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var responseContent = await response.Content.ReadAsStringAsync();
-        
+        var responseContent = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
         _logger.LogInformation("Created temporary user response: {Content}", responseContent);
         Assert.Equal(System.Net.HttpStatusCode.Created, response.StatusCode);
 
@@ -250,10 +250,10 @@ public class ConfigurationApiTests
             {
                 PropertyNameCaseInsensitive = true
             });
-            
+
             if (userResponse != null)
             {
-                var deleteResponse = await _configHttpClient.DeleteAsync($"/organizations/{organizationId}/users/{userResponse.Id}");
+                var deleteResponse = await _configHttpClient.DeleteAsync($"/organizations/{organizationId}/users/{userResponse.Id}", TestContext.Current.CancellationToken);
                 _logger.LogInformation("Cleaned up temporary user: {UserId}", userResponse.Id);
             }
         }
@@ -280,12 +280,12 @@ public class ConfigurationApiTests
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         // Act
-        var response = await _configHttpClient.PostAsync("/organizations", content);
+        var response = await _configHttpClient.PostAsync("/organizations", content, TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var responseContent = await response.Content.ReadAsStringAsync();
-        
+        var responseContent = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
         _logger.LogInformation("Created temporary organization response: {Content}", responseContent);
         Assert.Equal(System.Net.HttpStatusCode.Created, response.StatusCode);
 
@@ -296,10 +296,10 @@ public class ConfigurationApiTests
             {
                 PropertyNameCaseInsensitive = true
             });
-            
+
             if (orgResponse != null)
             {
-                var deleteResponse = await _configHttpClient.DeleteAsync($"/organizations/{orgResponse.Id}");
+                var deleteResponse = await _configHttpClient.DeleteAsync($"/organizations/{orgResponse.Id}", TestContext.Current.CancellationToken);
                 _logger.LogInformation("Cleaned up temporary organization: {OrganizationId}", orgResponse.Id);
             }
         }

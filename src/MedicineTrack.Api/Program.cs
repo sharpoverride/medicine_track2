@@ -52,6 +52,41 @@ builder.Services.AddValidatorsFromAssemblyContaining<CreateMedicationRequestVali
 
 var app = builder.Build();
 
+// Global exception handler for JSON deserialization and model binding errors
+app.Use(async (context, next) =>
+{
+    try
+    {
+        await next();
+    }
+    catch (BadHttpRequestException ex) when (ex.Message.Contains("Failed to read parameter"))
+    {
+        // JSON deserialization failed (e.g., invalid enum value)
+        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+        context.Response.ContentType = "application/problem+json";
+        await context.Response.WriteAsJsonAsync(new
+        {
+            type = "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+            title = "Bad Request",
+            status = 400,
+            detail = ex.Message
+        });
+    }
+    catch (System.Text.Json.JsonException ex)
+    {
+        // JSON parsing error
+        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+        context.Response.ContentType = "application/problem+json";
+        await context.Response.WriteAsJsonAsync(new
+        {
+            type = "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+            title = "Bad Request",
+            status = 400,
+            detail = $"Invalid JSON: {ex.Message}"
+        });
+    }
+});
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -210,8 +245,14 @@ medicationsGroup.MapDelete("/{medicationId:guid}", (Guid userId, Guid medication
 // --- Medication Logging Endpoints ---
 var medicationLogsGroup = app.MapGroup($"{baseApiRoute}/users/{{userId:guid}}").WithTags("Medication Logs");
 
-medicationLogsGroup.MapPost("/medications/{medicationId:guid}/logs", (Guid userId, Guid medicationId, [FromBody] LogMedicationRequest req) =>
+medicationLogsGroup.MapPost("/medications/{medicationId:guid}/logs", async (Guid userId, Guid medicationId, [FromBody] LogMedicationRequest req, IValidator<LogMedicationRequest> validator) =>
 {
+    var validationResult = await validator.ValidateAsync(req);
+    if (!validationResult.IsValid)
+    {
+        return Results.ValidationProblem(validationResult.ToDictionary());
+    }
+
     // Placeholder: Save log to DB
     var newLog = new MedicationLog(
         Guid.NewGuid(), userId, medicationId, req.ScheduleId, req.TakenAt, req.Status,
@@ -246,8 +287,14 @@ medicationLogsGroup.MapGet("/medications/{medicationId:guid}/logs", (Guid userId
 })
 .Produces<List<MedicationLog>>();
 
-medicationLogsGroup.MapPut("/medication-logs/{logId:guid}", (Guid userId, Guid logId, [FromBody] UpdateMedicationLogRequest req) =>
+medicationLogsGroup.MapPut("/medication-logs/{logId:guid}", async (Guid userId, Guid logId, [FromBody] UpdateMedicationLogRequest req, IValidator<UpdateMedicationLogRequest> validator) =>
 {
+    var validationResult = await validator.ValidateAsync(req);
+    if (!validationResult.IsValid)
+    {
+        return Results.ValidationProblem(validationResult.ToDictionary());
+    }
+
     // Placeholder: Retrieve log from DB, update, and save
     var updatedLog = new MedicationLog(
         logId, userId, Guid.NewGuid(), // Assuming medicationId is part of the log fetched from DB
@@ -257,7 +304,7 @@ medicationLogsGroup.MapPut("/medication-logs/{logId:guid}", (Guid userId, Guid l
         req.QuantityTaken,
         req.Notes,
         // LoggedAt should ideally not change, or have a separate UpdatedAt for the log
-        DateTimeOffset.UtcNow 
+        DateTimeOffset.UtcNow
     );
     return Results.Ok(updatedLog);
     // return Results.NotFound(); // If not found

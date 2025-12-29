@@ -53,7 +53,13 @@ if (app.Environment.IsDevelopment())
     app.UseCors();
 }
 
-app.UseHttpsRedirection();
+// Only apply HTTPS redirection for non-proxied requests
+// Skip HTTPS redirection for API routes to preserve downstream error responses
+app.UseWhen(
+    context => !context.Request.Path.StartsWithSegments("/medicines") &&
+               !context.Request.Path.StartsWithSegments("/configs"),
+    appBuilder => appBuilder.UseHttpsRedirection()
+);
 
 // Lightweight request/response logging for gateway traffic (no bodies)
 app.Use(async (context, next) =>

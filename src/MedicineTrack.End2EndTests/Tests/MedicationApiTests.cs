@@ -27,12 +27,12 @@ public class MedicationApiTests
     public async Task HealthCheck_Should_Return_OK()
     {
         // Act
-        var response = await _medicationHttpClient.GetAsync("/health");
+        var response = await _medicationHttpClient.GetAsync("/health", TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var content = await response.Content.ReadAsStringAsync();
-        
+        var content = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
         _logger.LogInformation("Health check response: {Content}", content);
         Assert.Contains("MedicineTrack API is OK", content);
     }
@@ -72,12 +72,12 @@ public class MedicationApiTests
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         // Act
-        var response = await _medicationHttpClient.PostAsync($"/users/{userId}/medications", content);
+        var response = await _medicationHttpClient.PostAsync($"/users/{userId}/medications", content, TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var responseContent = await response.Content.ReadAsStringAsync();
-        
+        var responseContent = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
         _logger.LogInformation("Created medication response: {Content}", responseContent);
         Assert.Equal(System.Net.HttpStatusCode.Created, response.StatusCode);
     }
@@ -89,14 +89,14 @@ public class MedicationApiTests
         var userId = _systemUserFixture.SystemUserId;
 
         // Act
-        var response = await _medicationHttpClient.GetAsync($"/users/{userId}/medications");
+        var response = await _medicationHttpClient.GetAsync($"/users/{userId}/medications", TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var content = await response.Content.ReadAsStringAsync();
-        
+        var content = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
         _logger.LogInformation("Get medications response: {Content}", content);
-        
+
         // Should return an array (even if empty)
         Assert.StartsWith("[", content.Trim());
         Assert.EndsWith("]", content.Trim());
@@ -111,14 +111,14 @@ public class MedicationApiTests
         var userId = _systemUserFixture.SystemUserId;
 
         // Act
-        var response = await _medicationHttpClient.GetAsync($"/users/{userId}/medications?status={status}");
+        var response = await _medicationHttpClient.GetAsync($"/users/{userId}/medications?status={status}", TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var content = await response.Content.ReadAsStringAsync();
-        
+        var content = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
         _logger.LogInformation("Get medications with status {Status} response: {Content}", status, content);
-        
+
         // Should return an array
         Assert.StartsWith("[", content.Trim());
         Assert.EndsWith("]", content.Trim());
@@ -132,14 +132,14 @@ public class MedicationApiTests
         var medicationId = Guid.NewGuid();
 
         // Act
-        var response = await _medicationHttpClient.GetAsync($"/users/{userId}/medications/{medicationId}");
+        var response = await _medicationHttpClient.GetAsync($"/users/{userId}/medications/{medicationId}", TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var content = await response.Content.ReadAsStringAsync();
-        
+        var content = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
         _logger.LogInformation("Get medication response: {Content}", content);
-        
+
         // Should return a medication object
         Assert.StartsWith("{", content.Trim());
         Assert.EndsWith("}", content.Trim());
@@ -162,14 +162,14 @@ public class MedicationApiTests
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         // Act
-        var response = await _medicationHttpClient.PutAsync($"/users/{userId}/medications/{medicationId}", content);
+        var response = await _medicationHttpClient.PutAsync($"/users/{userId}/medications/{medicationId}", content, TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var responseContent = await response.Content.ReadAsStringAsync();
-        
+        var responseContent = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
         _logger.LogInformation("Updated medication response: {Content}", responseContent);
-        
+
         // Should return updated medication object
         Assert.StartsWith("{", responseContent.Trim());
         Assert.EndsWith("}", responseContent.Trim());
@@ -183,12 +183,12 @@ public class MedicationApiTests
         var medicationId = Guid.NewGuid();
 
         // Act
-        var response = await _medicationHttpClient.DeleteAsync($"/users/{userId}/medications/{medicationId}");
+        var response = await _medicationHttpClient.DeleteAsync($"/users/{userId}/medications/{medicationId}", TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
         Assert.Equal(System.Net.HttpStatusCode.NoContent, response.StatusCode);
-        
+
         _logger.LogInformation("Deleted medication, status: {StatusCode}", response.StatusCode);
     }
 
@@ -199,14 +199,14 @@ public class MedicationApiTests
         var query = "Lisinopril";
 
         // Act
-        var response = await _medicationHttpClient.GetAsync($"/medication-database/search?query={query}");
+        var response = await _medicationHttpClient.GetAsync($"/medication-database/search?query={query}", TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var content = await response.Content.ReadAsStringAsync();
-        
+        var content = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
         _logger.LogInformation("Search medication database response: {Content}", content);
-        
+
         // Should return an array
         Assert.StartsWith("[", content.Trim());
         Assert.EndsWith("]", content.Trim());
@@ -231,12 +231,12 @@ public class MedicationApiTests
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         // Act
-        var response = await _medicationHttpClient.PostAsync($"/users/{userId}/medications/{medicationId}/logs", content);
+        var response = await _medicationHttpClient.PostAsync($"/users/{userId}/medications/{medicationId}/logs", content, TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var responseContent = await response.Content.ReadAsStringAsync();
-        
+        var responseContent = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
         _logger.LogInformation("Log medication response: {Content}", responseContent);
         Assert.Equal(System.Net.HttpStatusCode.Created, response.StatusCode);
     }
@@ -248,11 +248,11 @@ public class MedicationApiTests
         var userId = _systemUserFixture.SystemUserId;
 
         // Act
-        var response = await _medicationHttpClient.GetAsync($"/users/{userId}/medication-logs");
+        var response = await _medicationHttpClient.GetAsync($"/users/{userId}/medication-logs", TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var content = await response.Content.ReadAsStringAsync();
+        var content = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
         _logger.LogInformation("Get medication logs response: {Content}", content);
 
@@ -270,11 +270,11 @@ public class MedicationApiTests
         var userId = _systemUserFixture.SystemUserId;
 
         // Act
-        var response = await _medicationHttpClient.GetAsync($"/users/{userId}/medication-logs?status={status}");
+        var response = await _medicationHttpClient.GetAsync($"/users/{userId}/medication-logs?status={status}", TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var content = await response.Content.ReadAsStringAsync();
+        var content = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
         _logger.LogInformation("Get medication logs with status {Status} response: {Content}", status, content);
 
@@ -291,11 +291,11 @@ public class MedicationApiTests
         var medicationId = Guid.NewGuid();
 
         // Act
-        var response = await _medicationHttpClient.GetAsync($"/users/{userId}/medications/{medicationId}/logs");
+        var response = await _medicationHttpClient.GetAsync($"/users/{userId}/medications/{medicationId}/logs", TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var content = await response.Content.ReadAsStringAsync();
+        var content = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
         _logger.LogInformation("Get logs for medication {MedicationId} response: {Content}", medicationId, content);
 
@@ -322,11 +322,11 @@ public class MedicationApiTests
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         // Act
-        var response = await _medicationHttpClient.PutAsync($"/users/{userId}/medication-logs/{logId}", content);
+        var response = await _medicationHttpClient.PutAsync($"/users/{userId}/medication-logs/{logId}", content, TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var responseContent = await response.Content.ReadAsStringAsync();
+        var responseContent = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
         _logger.LogInformation("Updated medication log response: {Content}", responseContent);
 
@@ -343,7 +343,7 @@ public class MedicationApiTests
         var logId = Guid.NewGuid();
 
         // Act
-        var response = await _medicationHttpClient.DeleteAsync($"/users/{userId}/medication-logs/{logId}");
+        var response = await _medicationHttpClient.DeleteAsync($"/users/{userId}/medication-logs/{logId}", TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
@@ -368,11 +368,11 @@ public class MedicationApiTests
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         // Act
-        var response = await _medicationHttpClient.PostAsync($"/users/{userId}/medication-interactions/check", content);
+        var response = await _medicationHttpClient.PostAsync($"/users/{userId}/medication-interactions/check", content, TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var responseContent = await response.Content.ReadAsStringAsync();
+        var responseContent = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
         _logger.LogInformation("Check medication interactions response: {Content}", responseContent);
 
@@ -406,11 +406,11 @@ public class MedicationApiTests
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         // Act
-        var response = await _medicationHttpClient.PostAsync($"/users/{userId}/medication-interactions/check", content);
+        var response = await _medicationHttpClient.PostAsync($"/users/{userId}/medication-interactions/check", content, TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var responseContent = await response.Content.ReadAsStringAsync();
+        var responseContent = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
         _logger.LogInformation("Check interactions with new medication response: {Content}", responseContent);
 
@@ -448,7 +448,7 @@ public class MedicationApiTests
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         // Act
-        var response = await _medicationHttpClient.PostAsync($"/users/{userId}/medications", content);
+        var response = await _medicationHttpClient.PostAsync($"/users/{userId}/medications", content, TestContext.Current.CancellationToken);
 
         // Assert
         _logger.LogInformation("Create medication with invalid strength response: {StatusCode}", response.StatusCode);
@@ -482,7 +482,7 @@ public class MedicationApiTests
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         // Act
-        var response = await _medicationHttpClient.PostAsync($"/users/{userId}/medications", content);
+        var response = await _medicationHttpClient.PostAsync($"/users/{userId}/medications", content, TestContext.Current.CancellationToken);
 
         // Assert
         _logger.LogInformation("Create medication with empty name response: {StatusCode}", response.StatusCode);
@@ -507,7 +507,7 @@ public class MedicationApiTests
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         // Act
-        var response = await _medicationHttpClient.PostAsync($"/users/{userId}/medications", content);
+        var response = await _medicationHttpClient.PostAsync($"/users/{userId}/medications", content, TestContext.Current.CancellationToken);
 
         // Assert
         _logger.LogInformation("Create medication with no schedules response: {StatusCode}", response.StatusCode);
@@ -542,7 +542,7 @@ public class MedicationApiTests
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         // Act
-        var response = await _medicationHttpClient.PostAsync($"/users/{userId}/medications", content);
+        var response = await _medicationHttpClient.PostAsync($"/users/{userId}/medications", content, TestContext.Current.CancellationToken);
 
         // Assert
         _logger.LogInformation("Create medication with end date before start date response: {StatusCode}", response.StatusCode);
@@ -555,17 +555,277 @@ public class MedicationApiTests
         // Arrange - empty query should still return valid response
 
         // Act
-        var response = await _medicationHttpClient.GetAsync("/medication-database/search?query=");
+        var response = await _medicationHttpClient.GetAsync("/medication-database/search?query=", TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var content = await response.Content.ReadAsStringAsync();
+        var content = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
         _logger.LogInformation("Search with empty query response: {Content}", content);
 
         // Should return an array (possibly empty)
         Assert.StartsWith("[", content.Trim());
         Assert.EndsWith("]", content.Trim());
+    }
+
+    [Fact]
+    public async Task LogMedication_WithFutureTakenAt_Should_Return_BadRequest()
+    {
+        // Arrange
+        var userId = _systemUserFixture.SystemUserId;
+        var medicationId = Guid.NewGuid();
+        var logRequest = new
+        {
+            ScheduleId = Guid.NewGuid(),
+            TakenAt = DateTimeOffset.UtcNow.AddDays(1), // Future date should fail
+            Status = "TAKEN",
+            QuantityTaken = 1.0,
+            Notes = "Test log"
+        };
+
+        var json = JsonSerializer.Serialize(logRequest);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        // Act
+        var response = await _medicationHttpClient.PostAsync($"/users/{userId}/medications/{medicationId}/logs", content, TestContext.Current.CancellationToken);
+
+        // Assert
+        _logger.LogInformation("Log medication with future TakenAt response: {StatusCode}", response.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task LogMedication_WithInvalidStatus_Should_Return_BadRequest()
+    {
+        // Arrange
+        var userId = _systemUserFixture.SystemUserId;
+        var medicationId = Guid.NewGuid();
+        var logRequest = new
+        {
+            ScheduleId = Guid.NewGuid(),
+            TakenAt = DateTimeOffset.UtcNow,
+            Status = "INVALID_STATUS", // Invalid status should fail
+            QuantityTaken = 1.0,
+            Notes = "Test log"
+        };
+
+        var json = JsonSerializer.Serialize(logRequest);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        // Act
+        var response = await _medicationHttpClient.PostAsync($"/users/{userId}/medications/{medicationId}/logs", content, TestContext.Current.CancellationToken);
+
+        // Assert
+        _logger.LogInformation("Log medication with invalid status response: {StatusCode}", response.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task LogMedication_WithNegativeQuantity_Should_Return_BadRequest()
+    {
+        // Arrange
+        var userId = _systemUserFixture.SystemUserId;
+        var medicationId = Guid.NewGuid();
+        var logRequest = new
+        {
+            ScheduleId = Guid.NewGuid(),
+            TakenAt = DateTimeOffset.UtcNow,
+            Status = "TAKEN",
+            QuantityTaken = -1.0, // Negative quantity should fail
+            Notes = "Test log"
+        };
+
+        var json = JsonSerializer.Serialize(logRequest);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        // Act
+        var response = await _medicationHttpClient.PostAsync($"/users/{userId}/medications/{medicationId}/logs", content, TestContext.Current.CancellationToken);
+
+        // Assert
+        _logger.LogInformation("Log medication with negative quantity response: {StatusCode}", response.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task LogMedication_WithZeroQuantity_Should_Return_BadRequest()
+    {
+        // Arrange
+        var userId = _systemUserFixture.SystemUserId;
+        var medicationId = Guid.NewGuid();
+        var logRequest = new
+        {
+            ScheduleId = Guid.NewGuid(),
+            TakenAt = DateTimeOffset.UtcNow,
+            Status = "TAKEN",
+            QuantityTaken = 0.0, // Zero quantity should fail
+            Notes = "Test log"
+        };
+
+        var json = JsonSerializer.Serialize(logRequest);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        // Act
+        var response = await _medicationHttpClient.PostAsync($"/users/{userId}/medications/{medicationId}/logs", content, TestContext.Current.CancellationToken);
+
+        // Assert
+        _logger.LogInformation("Log medication with zero quantity response: {StatusCode}", response.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task LogMedication_WithTooLongNotes_Should_Return_BadRequest()
+    {
+        // Arrange
+        var userId = _systemUserFixture.SystemUserId;
+        var medicationId = Guid.NewGuid();
+        var logRequest = new
+        {
+            ScheduleId = Guid.NewGuid(),
+            TakenAt = DateTimeOffset.UtcNow,
+            Status = "TAKEN",
+            QuantityTaken = 1.0,
+            Notes = new string('x', 501) // Notes exceeding 500 characters should fail
+        };
+
+        var json = JsonSerializer.Serialize(logRequest);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        // Act
+        var response = await _medicationHttpClient.PostAsync($"/users/{userId}/medications/{medicationId}/logs", content, TestContext.Current.CancellationToken);
+
+        // Assert
+        _logger.LogInformation("Log medication with too long notes response: {StatusCode}", response.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateMedicationLog_WithFutureTakenAt_Should_Return_BadRequest()
+    {
+        // Arrange
+        var userId = _systemUserFixture.SystemUserId;
+        var logId = Guid.NewGuid();
+        var updateRequest = new
+        {
+            TakenAt = DateTimeOffset.UtcNow.AddDays(1), // Future date should fail
+            Status = "TAKEN",
+            QuantityTaken = 1.0,
+            Notes = "Updated notes"
+        };
+
+        var json = JsonSerializer.Serialize(updateRequest);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        // Act
+        var response = await _medicationHttpClient.PutAsync($"/users/{userId}/medication-logs/{logId}", content, TestContext.Current.CancellationToken);
+
+        // Assert
+        _logger.LogInformation("Update medication log with future TakenAt response: {StatusCode}", response.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateMedicationLog_WithInvalidStatus_Should_Return_BadRequest()
+    {
+        // Arrange
+        var userId = _systemUserFixture.SystemUserId;
+        var logId = Guid.NewGuid();
+        var updateRequest = new
+        {
+            TakenAt = DateTimeOffset.UtcNow,
+            Status = "INVALID_STATUS", // Invalid status should fail
+            QuantityTaken = 1.0,
+            Notes = "Updated notes"
+        };
+
+        var json = JsonSerializer.Serialize(updateRequest);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        // Act
+        var response = await _medicationHttpClient.PutAsync($"/users/{userId}/medication-logs/{logId}", content, TestContext.Current.CancellationToken);
+
+        // Assert
+        _logger.LogInformation("Update medication log with invalid status response: {StatusCode}", response.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateMedicationLog_WithNegativeQuantity_Should_Return_BadRequest()
+    {
+        // Arrange
+        var userId = _systemUserFixture.SystemUserId;
+        var logId = Guid.NewGuid();
+        var updateRequest = new
+        {
+            TakenAt = DateTimeOffset.UtcNow,
+            Status = "TAKEN",
+            QuantityTaken = -5.0, // Negative quantity should fail
+            Notes = "Updated notes"
+        };
+
+        var json = JsonSerializer.Serialize(updateRequest);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        // Act
+        var response = await _medicationHttpClient.PutAsync($"/users/{userId}/medication-logs/{logId}", content, TestContext.Current.CancellationToken);
+
+        // Assert
+        _logger.LogInformation("Update medication log with negative quantity response: {StatusCode}", response.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateMedicationLog_WithTooLongNotes_Should_Return_BadRequest()
+    {
+        // Arrange
+        var userId = _systemUserFixture.SystemUserId;
+        var logId = Guid.NewGuid();
+        var updateRequest = new
+        {
+            TakenAt = DateTimeOffset.UtcNow,
+            Status = "TAKEN",
+            QuantityTaken = 1.0,
+            Notes = new string('y', 501) // Notes exceeding 500 characters should fail
+        };
+
+        var json = JsonSerializer.Serialize(updateRequest);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        // Act
+        var response = await _medicationHttpClient.PutAsync($"/users/{userId}/medication-logs/{logId}", content, TestContext.Current.CancellationToken);
+
+        // Assert
+        _logger.LogInformation("Update medication log with too long notes response: {StatusCode}", response.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("TAKEN")]
+    [InlineData("SKIPPED")]
+    [InlineData("LOGGED_AS_NEEDED")]
+    public async Task LogMedication_WithValidStatus_Should_Return_Created(string status)
+    {
+        // Arrange
+        var userId = _systemUserFixture.SystemUserId;
+        var medicationId = Guid.NewGuid();
+        var logRequest = new
+        {
+            ScheduleId = Guid.NewGuid(),
+            TakenAt = DateTimeOffset.UtcNow,
+            Status = status,
+            QuantityTaken = 1.0,
+            Notes = "Valid log entry"
+        };
+
+        var json = JsonSerializer.Serialize(logRequest);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        // Act
+        var response = await _medicationHttpClient.PostAsync($"/users/{userId}/medications/{medicationId}/logs", content, TestContext.Current.CancellationToken);
+
+        // Assert
+        response.EnsureSuccessStatusCode();
+        _logger.LogInformation("Log medication with status {Status} response: {StatusCode}", status, response.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.Created, response.StatusCode);
     }
 
     #endregion
