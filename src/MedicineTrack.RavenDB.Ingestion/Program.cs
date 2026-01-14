@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Net;
 using System.Net.Security;
 using System.Text.Json;
@@ -104,11 +105,27 @@ app.MapPost("/v1/traces", async (
 {
     try
     {
+        // Decompress if gzip-encoded (OTEL Collector compresses by default)
+        Stream requestBody = context.Request.Body;
+        var contentEncoding = context.Request.Headers.ContentEncoding.ToString();
+
+        if (contentEncoding.Contains("gzip", StringComparison.OrdinalIgnoreCase))
+        {
+            requestBody = new GZipStream(requestBody, CompressionMode.Decompress);
+        }
+
         // Manually deserialize to get better error messages
         OtlpTraceRequest? otlpRequest;
         try
         {
-            otlpRequest = await context.Request.ReadFromJsonAsync<OtlpTraceRequest>(cancellationToken);
+            otlpRequest = await JsonSerializer.DeserializeAsync<OtlpTraceRequest>(requestBody,
+                new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                },
+                cancellationToken);
+
             if (otlpRequest == null)
             {
                 logger.LogWarning("Received null OTLP trace request");
@@ -162,11 +179,27 @@ app.MapPost("/v1/logs", async (
 {
     try
     {
+        // Decompress if gzip-encoded (OTEL Collector compresses by default)
+        Stream requestBody = context.Request.Body;
+        var contentEncoding = context.Request.Headers.ContentEncoding.ToString();
+
+        if (contentEncoding.Contains("gzip", StringComparison.OrdinalIgnoreCase))
+        {
+            requestBody = new GZipStream(requestBody, CompressionMode.Decompress);
+        }
+
         // Manually deserialize to get better error messages
         OtlpLogsRequest? otlpRequest;
         try
         {
-            otlpRequest = await context.Request.ReadFromJsonAsync<OtlpLogsRequest>(cancellationToken);
+            otlpRequest = await JsonSerializer.DeserializeAsync<OtlpLogsRequest>(requestBody,
+                new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                },
+                cancellationToken);
+
             if (otlpRequest == null)
             {
                 logger.LogWarning("Received null OTLP logs request");
