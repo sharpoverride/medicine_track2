@@ -9,6 +9,14 @@ var postgres = builder.AddPostgres("postgresdb");
 var medicationDb = postgres.AddDatabase("medicationdb");
 var configurationDb = postgres.AddDatabase("configurationdb");
 
+// Kusto emulator for telemetry data
+var kusto = builder.AddContainer("kusto-emulator", "mcr.microsoft.com/azuredataexplorer/kustainer-linux")
+    .WithImageTag("latest")
+    .WithHttpEndpoint(port: 8080, targetPort: 8080, name: "kusto-http")
+    .WithEnvironment("ACCEPT_EULA", "Y")
+    .WithBindMount("./kusto-data", "/kustodata")
+    .WithArgs("--memory", "4g");
+
 // Migration projects - run these first to set up databases
 var medicationMigrations = builder.AddProject<Projects.MedicineTrack_Medication_Migrations>("medication-migrations")
     .WithReference(medicationDb)
