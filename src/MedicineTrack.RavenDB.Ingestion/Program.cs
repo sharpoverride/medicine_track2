@@ -64,9 +64,6 @@ builder.Services.AddSingleton<IDocumentStore>(sp =>
 // Add RavenDB ingestion service
 builder.Services.AddSingleton<IRavenDBIngestionService, RavenDBIngestionService>();
 
-// TODO RAVEN-3.4: Remove old Kusto service after endpoint migration
-builder.Services.AddSingleton<IKustoIngestionService, KustoIngestionService>();
-
 var app = builder.Build();
 
 var logger = app.Logger;
@@ -78,8 +75,8 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "rave
 
 // Ingestion endpoints
 app.MapPost("/ingest/traces", async (
-    TraceData[] traces,
-    IKustoIngestionService ingestionService,
+    TraceDocument[] traces,
+    IRavenDBIngestionService ingestionService,
     ILogger<Program> logger,
     CancellationToken cancellationToken) =>
 {
@@ -87,7 +84,7 @@ app.MapPost("/ingest/traces", async (
     {
         logger.LogInformation("Received {Count} traces for ingestion", traces.Length);
         await ingestionService.IngestTracesAsync(traces, cancellationToken);
-        return Results.Ok(new { ingested = traces.Length, table = "traces" });
+        return Results.Ok(new { ingested = traces.Length, collection = "Traces" });
     }
     catch (Exception ex)
     {
@@ -105,8 +102,8 @@ app.MapPost("/ingest/traces", async (
 .Produces(StatusCodes.Status500InternalServerError);
 
 app.MapPost("/ingest/requests", async (
-    RequestData[] requests,
-    IKustoIngestionService ingestionService,
+    RequestDocument[] requests,
+    IRavenDBIngestionService ingestionService,
     ILogger<Program> logger,
     CancellationToken cancellationToken) =>
 {
@@ -114,7 +111,7 @@ app.MapPost("/ingest/requests", async (
     {
         logger.LogInformation("Received {Count} requests for ingestion", requests.Length);
         await ingestionService.IngestRequestsAsync(requests, cancellationToken);
-        return Results.Ok(new { ingested = requests.Length, table = "requests" });
+        return Results.Ok(new { ingested = requests.Length, collection = "Requests" });
     }
     catch (Exception ex)
     {
@@ -132,8 +129,8 @@ app.MapPost("/ingest/requests", async (
 .Produces(StatusCodes.Status500InternalServerError);
 
 app.MapPost("/ingest/dependencies", async (
-    DependencyData[] dependencies,
-    IKustoIngestionService ingestionService,
+    DependencyDocument[] dependencies,
+    IRavenDBIngestionService ingestionService,
     ILogger<Program> logger,
     CancellationToken cancellationToken) =>
 {
@@ -141,7 +138,7 @@ app.MapPost("/ingest/dependencies", async (
     {
         logger.LogInformation("Received {Count} dependencies for ingestion", dependencies.Length);
         await ingestionService.IngestDependenciesAsync(dependencies, cancellationToken);
-        return Results.Ok(new { ingested = dependencies.Length, table = "dependencies" });
+        return Results.Ok(new { ingested = dependencies.Length, collection = "Dependencies" });
     }
     catch (Exception ex)
     {
@@ -159,8 +156,8 @@ app.MapPost("/ingest/dependencies", async (
 .Produces(StatusCodes.Status500InternalServerError);
 
 app.MapPost("/ingest/exceptions", async (
-    ExceptionData[] exceptions,
-    IKustoIngestionService ingestionService,
+    ExceptionDocument[] exceptions,
+    IRavenDBIngestionService ingestionService,
     ILogger<Program> logger,
     CancellationToken cancellationToken) =>
 {
@@ -168,7 +165,7 @@ app.MapPost("/ingest/exceptions", async (
     {
         logger.LogInformation("Received {Count} exceptions for ingestion", exceptions.Length);
         await ingestionService.IngestExceptionsAsync(exceptions, cancellationToken);
-        return Results.Ok(new { ingested = exceptions.Length, table = "exceptions" });
+        return Results.Ok(new { ingested = exceptions.Length, collection = "Exceptions" });
     }
     catch (Exception ex)
     {
