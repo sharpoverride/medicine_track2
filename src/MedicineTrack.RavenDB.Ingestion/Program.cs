@@ -62,6 +62,9 @@ builder.Services.AddSingleton<IDocumentStore>(sp =>
 });
 
 // Add RavenDB ingestion service
+builder.Services.AddSingleton<IRavenDBIngestionService, RavenDBIngestionService>();
+
+// TODO RAVEN-3.4: Remove old Kusto service after endpoint migration
 builder.Services.AddSingleton<IKustoIngestionService, KustoIngestionService>();
 
 var app = builder.Build();
