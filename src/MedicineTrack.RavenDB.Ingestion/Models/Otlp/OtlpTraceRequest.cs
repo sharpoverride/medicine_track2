@@ -57,6 +57,7 @@ public record KeyValue
     public AnyValue? Value { get; init; }
 }
 
+[System.Text.Json.Serialization.JsonConverter(typeof(AnyValueJsonConverter))]
 public record AnyValue
 {
     public string? StringValue { get; init; }
