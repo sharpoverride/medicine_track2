@@ -40,8 +40,8 @@ exporters:
       max_backups: 3
 
   # Debug output for troubleshooting
-  logging:
-    loglevel: info
+  debug:
+    verbosity: normal
     sampling_initial: 5
     sampling_thereafter: 200
 
@@ -50,12 +50,12 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch, attributes]
-      exporters: [file, logging]
+      exporters: [file, debug]
 
     logs:
       receivers: [otlp]
       processors: [batch, attributes, resource]
-      exporters: [file, logging]
+      exporters: [file, debug]
 
   telemetry:
     logs:
