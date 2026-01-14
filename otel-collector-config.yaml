@@ -1,0 +1,61 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 10s
+    send_batch_size: 100
+    send_batch_max_size: 200
+
+  # Transform to Application Insights schema attributes
+  attributes:
+    actions:
+      - key: cloud.role.name
+        action: insert
+        from_attribute: service.name
+      - key: cloud.role.instance
+        action: insert
+        from_attribute: service.instance.id
+
+  # Add itemType for Application Insights compatibility
+  resource:
+    attributes:
+      - key: itemType
+        value: "trace"
+        action: insert
+
+exporters:
+  # File exporter for initial MVP - will be replaced with HTTP to Kusto ingestion service
+  file:
+    path: /var/otel/telemetry.json
+    rotation:
+      max_megabytes: 50
+      max_days: 1
+      max_backups: 3
+
+  # Debug output for troubleshooting
+  logging:
+    loglevel: info
+    sampling_initial: 5
+    sampling_thereafter: 200
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch, attributes]
+      exporters: [file, logging]
+
+    logs:
+      receivers: [otlp]
+      processors: [batch, attributes, resource]
+      exporters: [file, logging]
+
+  telemetry:
+    logs:
+      level: info
