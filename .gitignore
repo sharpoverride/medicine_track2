@@ -103,3 +103,6 @@ Thumbs.db
 
 # macOS
 .DS_Store
+
+# Claude Code workflow state
+.claude/

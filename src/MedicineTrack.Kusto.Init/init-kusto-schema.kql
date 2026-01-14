@@ -1,0 +1,82 @@
+// Create persistent database for MedicineTrack telemetry
+.create database medicinetrack persist (
+    softdelete = 30d,
+    hotcache = 7d
+)
+
+// Use the database
+.execute database medicinetrack script <|
+
+// Table 1: traces (application logs)
+.create table traces (
+    timestamp: datetime,
+    message: string,
+    severityLevel: int,
+    operation_Name: string,
+    operation_Id: string,
+    cloud_RoleName: string,
+    cloud_RoleInstance: string,
+    customDimensions: dynamic,
+    itemType: string
+)
+
+// Table 2: requests (HTTP requests)
+.create table requests (
+    timestamp: datetime,
+    name: string,
+    url: string,
+    success: string,
+    resultCode: string,
+    duration: real,
+    operation_Name: string,
+    operation_Id: string,
+    cloud_RoleName: string,
+    cloud_RoleInstance: string,
+    customDimensions: dynamic,
+    customMeasurements: dynamic,
+    itemType: string
+)
+
+// Table 3: dependencies (external calls)
+.create table dependencies (
+    timestamp: datetime,
+    name: string,
+    type: string,
+    target: string,
+    data: string,
+    success: string,
+    resultCode: string,
+    duration: real,
+    operation_Name: string,
+    operation_Id: string,
+    cloud_RoleName: string,
+    cloud_RoleInstance: string,
+    customDimensions: dynamic,
+    itemType: string
+)
+
+// Table 4: exceptions
+.create table exceptions (
+    timestamp: datetime,
+    problemId: string,
+    type: string,
+    message: string,
+    outerType: string,
+    outerMessage: string,
+    innermostType: string,
+    innermostMessage: string,
+    severityLevel: int,
+    stack: string,
+    operation_Name: string,
+    operation_Id: string,
+    cloud_RoleName: string,
+    cloud_RoleInstance: string,
+    customDimensions: dynamic,
+    itemType: string
+)
+
+// Enable streaming ingestion for all tables
+.alter table traces policy streamingingestion enable
+.alter table requests policy streamingingestion enable
+.alter table dependencies policy streamingingestion enable
+.alter table exceptions policy streamingingestion enable
