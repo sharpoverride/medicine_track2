@@ -18,7 +18,15 @@ var otelCollector = builder.AddContainer("otel-collector", "otel/opentelemetry-c
     .WithBindMount("./otel-data", "/var/otel");
 
 // RavenDB Ingestion service
+// Configure RavenDB connection (external RavenDB instance)
+var ravenDbUrl = builder.Configuration["RavenDB:Url"]
+    ?? "https://ravendb.ravendb.orb.local";
+var ravenDbDatabase = builder.Configuration["RavenDB:Database"]
+    ?? "telemetry";
+
 var ravenDbIngestion = builder.AddProject<Projects.MedicineTrack_RavenDB_Ingestion>("ravendb-ingestion")
+    .WithEnvironment("RavenDB__Url", ravenDbUrl)
+    .WithEnvironment("RavenDB__Database", ravenDbDatabase)
     .WithHttpEndpoint(port: 5003, name: "ingestion-http");
 
 // Migration projects - run these first to set up databases
