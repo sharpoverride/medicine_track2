@@ -1,0 +1,136 @@
+// RavenDB (RQL) Test Queries for Telemetry Analysis
+// Execute these queries in RavenDB Studio (https://ravendb.ravendb.orb.local/)
+// Database: telemetry
+
+// ==========================================
+// 1. Recent Traces (Service Health Check)
+// ==========================================
+// Description: Get traces from last 2 minutes to verify service is emitting telemetry
+// Use case: Health monitoring, troubleshooting recent issues
+
+from Traces
+where Timestamp > @now - TimeSpan.FromMinutes(2)
+order by Timestamp desc
+select CloudRoleName, Timestamp, Message, SeverityLevel
+
+
+// ==========================================
+// 2. Request Volume by Service
+// ==========================================
+// Description: Analyze request volume and average duration per service and status code
+// Use case: Performance monitoring, capacity planning
+
+from Requests
+where Timestamp > @now - TimeSpan.FromHours(1)
+group by CloudRoleName, ResultCode
+select CloudRoleName, ResultCode,
+       count() as RequestCount,
+       avg(DurationMs) as AvgDuration
+order by RequestCount desc
+
+
+// ==========================================
+// 3. Slow Dependencies
+// ==========================================
+// Description: Find dependencies taking longer than 100ms
+// Use case: Performance optimization, identifying bottlenecks
+
+from Dependencies
+where Timestamp > @now - TimeSpan.FromHours(1) and DurationMs > 100
+order by DurationMs desc
+select Timestamp, CloudRoleName, Name, Type, Target, DurationMs, Success
+
+
+// ==========================================
+// 4. Exceptions by Service
+// ==========================================
+// Description: Count exceptions grouped by service and exception type
+// Use case: Error analysis, reliability monitoring
+
+from Exceptions
+where Timestamp > @now - TimeSpan.FromDays(1)
+group by CloudRoleName, InnermostType
+select CloudRoleName, InnermostType, count() as ExceptionCount
+order by ExceptionCount desc
+
+
+// ==========================================
+// 5. Distributed Trace Correlation
+// ==========================================
+// Description: Get all telemetry for a specific trace ID (distributed tracing)
+// Use case: Debugging cross-service requests, understanding request flow
+// NOTE: Replace "YOUR-TRACE-ID-HERE" with actual OperationId from a trace
+
+from index 'Telemetry/ByTraceId'
+where OperationId == "YOUR-TRACE-ID-HERE"
+order by Timestamp asc
+select Timestamp, ItemType, CloudRoleName, OperationId
+
+
+// ==========================================
+// 6. Error Rate by Service
+// ==========================================
+// Description: Calculate error rate percentage for each service
+// Use case: SLA monitoring, service reliability metrics
+
+from Requests
+where Timestamp > @now - TimeSpan.FromHours(1)
+group by CloudRoleName
+select CloudRoleName,
+       count() as TotalRequests,
+       sum(Success == false ? 1 : 0) as FailedRequests,
+       (sum(Success == false ? 1 : 0) * 100.0 / count()) as ErrorRatePercent
+order by ErrorRatePercent desc
+
+
+// ==========================================
+// 7. High Severity Traces
+// ==========================================
+// Description: Get ERROR and CRITICAL level traces (severity 3-4)
+// Use case: Alert investigation, critical issue monitoring
+
+from Traces
+where Timestamp > @now - TimeSpan.FromHours(1) and SeverityLevel >= 3
+order by SeverityLevel desc, Timestamp desc
+select Timestamp, CloudRoleName, SeverityLevel, Message, OperationId
+
+
+// ==========================================
+// 8. Request Duration Percentiles
+// ==========================================
+// Description: Analyze request duration distribution (P50, P95, P99)
+// Use case: Performance SLA validation, latency analysis
+
+from Requests
+where Timestamp > @now - TimeSpan.FromHours(1)
+select percentile(DurationMs, 50) as P50,
+       percentile(DurationMs, 95) as P95,
+       percentile(DurationMs, 99) as P99,
+       avg(DurationMs) as AvgDuration
+
+
+// ==========================================
+// 9. Service-to-Service Call Map
+// ==========================================
+// Description: Identify which services call which dependencies
+// Use case: Service dependency mapping, architecture visualization
+
+from Dependencies
+where Timestamp > @now - TimeSpan.FromDays(1)
+group by CloudRoleName, Type, Target
+select CloudRoleName as CallingService,
+       Type as DependencyType,
+       Target as CalledService,
+       count() as CallCount
+
+
+// ==========================================
+// 10. Failed Requests with Details
+// ==========================================
+// Description: Get all failed requests with full context
+// Use case: Error investigation, debugging failed requests
+
+from Requests
+where Timestamp > @now - TimeSpan.FromHours(1) and Success == false
+order by Timestamp desc
+select Timestamp, CloudRoleName, Name, Url, ResultCode, DurationMs, OperationId
