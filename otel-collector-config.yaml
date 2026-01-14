@@ -30,7 +30,8 @@ processors:
         action: insert
 
 exporters:
-  # File exporter for initial MVP - will be replaced with HTTP to Kusto ingestion service
+  # File exporter for telemetry data
+  # Future enhancement: Add HTTP exporter to RavenDB ingestion service endpoint
   file:
     path: /var/otel/telemetry.json
     rotation:
