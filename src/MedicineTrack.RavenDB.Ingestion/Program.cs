@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Security;
 using MedicineTrack.RavenDB.Ingestion.Indexes;
 using MedicineTrack.RavenDB.Ingestion.Models;
+using MedicineTrack.RavenDB.Ingestion.Models.Otlp;
 using MedicineTrack.RavenDB.Ingestion.Services;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Trace;
@@ -85,7 +86,84 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "rave
     .WithName("HealthCheck")
     .WithTags("Health");
 
-// Ingestion endpoints
+// OTLP standard endpoints (for OpenTelemetry Collector)
+app.MapPost("/v1/traces", async (
+    OtlpTraceRequest otlpRequest,
+    IRavenDBIngestionService ingestionService,
+    ILogger<Program> logger,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        logger.LogInformation("Received OTLP traces with {Count} resource spans", otlpRequest.ResourceSpans.Count);
+
+        var (traces, requests) = OtlpMapper.MapTraces(otlpRequest);
+
+        if (traces.Count > 0)
+        {
+            await ingestionService.IngestTracesAsync(traces.ToArray(), cancellationToken);
+            logger.LogInformation("Ingested {Count} traces from OTLP", traces.Count);
+        }
+
+        if (requests.Count > 0)
+        {
+            await ingestionService.IngestRequestsAsync(requests.ToArray(), cancellationToken);
+            logger.LogInformation("Ingested {Count} requests from OTLP", requests.Count);
+        }
+
+        return Results.Ok(new { ingested = traces.Count + requests.Count });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Failed to ingest OTLP traces");
+        return Results.Problem(
+            title: "OTLP Ingestion Failed",
+            detail: ex.Message,
+            statusCode: 500
+        );
+    }
+})
+.WithName("IngestOtlpTraces")
+.WithTags("OTLP")
+.Produces(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status500InternalServerError);
+
+app.MapPost("/v1/logs", async (
+    OtlpLogsRequest otlpRequest,
+    IRavenDBIngestionService ingestionService,
+    ILogger<Program> logger,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        logger.LogInformation("Received OTLP logs with {Count} resource logs", otlpRequest.ResourceLogs.Count);
+
+        var traces = OtlpMapper.MapLogs(otlpRequest);
+
+        if (traces.Count > 0)
+        {
+            await ingestionService.IngestTracesAsync(traces.ToArray(), cancellationToken);
+            logger.LogInformation("Ingested {Count} log traces from OTLP", traces.Count);
+        }
+
+        return Results.Ok(new { ingested = traces.Count });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Failed to ingest OTLP logs");
+        return Results.Problem(
+            title: "OTLP Ingestion Failed",
+            detail: ex.Message,
+            statusCode: 500
+        );
+    }
+})
+.WithName("IngestOtlpLogs")
+.WithTags("OTLP")
+.Produces(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status500InternalServerError);
+
+// Custom ingestion endpoints (for manual testing)
 app.MapPost("/ingest/traces", async (
     TraceDocument[] traces,
     IRavenDBIngestionService ingestionService,
@@ -195,10 +273,15 @@ app.MapPost("/ingest/exceptions", async (
 .Produces(StatusCodes.Status500InternalServerError);
 
 logger.LogInformation("RavenDB Ingestion service started. Endpoints available:");
-logger.LogInformation("  - POST /ingest/traces");
-logger.LogInformation("  - POST /ingest/requests");
-logger.LogInformation("  - POST /ingest/dependencies");
-logger.LogInformation("  - POST /ingest/exceptions");
-logger.LogInformation("  - GET /health");
+logger.LogInformation("  OTLP (OpenTelemetry Collector):");
+logger.LogInformation("    - POST /v1/traces");
+logger.LogInformation("    - POST /v1/logs");
+logger.LogInformation("  Custom (Manual testing):");
+logger.LogInformation("    - POST /ingest/traces");
+logger.LogInformation("    - POST /ingest/requests");
+logger.LogInformation("    - POST /ingest/dependencies");
+logger.LogInformation("    - POST /ingest/exceptions");
+logger.LogInformation("  Health:");
+logger.LogInformation("    - GET /health");
 
 app.Run();

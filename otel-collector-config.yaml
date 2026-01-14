@@ -30,8 +30,7 @@ processors:
         action: insert
 
 exporters:
-  # File exporter for telemetry data
-  # Future enhancement: Add HTTP exporter to RavenDB ingestion service endpoint
+  # File exporter for telemetry data backup
   file:
     path: /var/otel/telemetry.json
     rotation:
@@ -45,17 +44,26 @@ exporters:
     sampling_initial: 5
     sampling_thereafter: 200
 
+  # RavenDB Ingestion Service OTLP HTTP exporter
+  # Note: Using host.docker.internal to reach the .NET service running on the host
+  otlphttp/ravendb:
+    endpoint: http://host.docker.internal:5003
+    traces_endpoint: http://host.docker.internal:5003/v1/traces
+    logs_endpoint: http://host.docker.internal:5003/v1/logs
+    encoding: json
+    timeout: 30s
+
 service:
   pipelines:
     traces:
       receivers: [otlp]
       processors: [batch, attributes]
-      exporters: [file, debug]
+      exporters: [file, debug, otlphttp/ravendb]
 
     logs:
       receivers: [otlp]
       processors: [batch, attributes, resource]
-      exporters: [file, debug]
+      exporters: [file, debug, otlphttp/ravendb]
 
   telemetry:
     logs:
