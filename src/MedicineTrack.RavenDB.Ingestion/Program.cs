@@ -1,8 +1,10 @@
+using MedicineTrack.RavenDB.Ingestion.Indexes;
 using MedicineTrack.RavenDB.Ingestion.Models;
 using MedicineTrack.RavenDB.Ingestion.Services;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Trace;
 using Raven.Client.Documents;
+using Raven.Client.Documents.Indexes;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -51,10 +53,15 @@ builder.Services.AddSingleton<IDocumentStore>(sp =>
     {
         store.Initialize();
         logger.LogInformation("RavenDB DocumentStore initialized successfully");
+
+        // Deploy indexes
+        logger.LogInformation("Deploying RavenDB indexes");
+        IndexCreation.CreateIndexes(typeof(Traces_ByServiceAndTime).Assembly, store);
+        logger.LogInformation("RavenDB indexes deployed successfully");
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "Failed to initialize RavenDB DocumentStore");
+        logger.LogError(ex, "Failed to initialize RavenDB DocumentStore or deploy indexes");
         throw;
     }
 
