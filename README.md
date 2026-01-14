@@ -36,6 +36,18 @@ MedicineTrack follows a microservices architecture built on .NET Aspire, providi
 │ • Entity Framework Core (Data Access)                          │
 │ • Migrations (Database Schema Management)                       │
 └─────────────────────────────────────────────────────────────────┘
+                                    │
+┌─────────────────────────────────────────────────────────────────┐
+│                    Telemetry & Observability                     │
+│                                                                 │
+│ • OpenTelemetry Collector (OTLP: 4317/4318)                    │
+│ • RavenDB Ingestion Service (Port 5003)                        │
+│ • RavenDB (Telemetry Storage)                                  │
+│   - Traces Collection (Application logs)                       │
+│   - Requests Collection (HTTP requests)                        │
+│   - Dependencies Collection (Database/HTTP calls)              │
+│   - Exceptions Collection (Application errors)                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ### Project Structure
@@ -47,12 +59,17 @@ medicine_track/
 │   ├── MedicineTrack.Api/                  # Main API service
 │   ├── MedicineTrack.Configuration/        # Configuration service
 │   ├── MedicineTrack.Gateway/              # API Gateway (YARP)
+│   ├── MedicineTrack.RavenDB.Ingestion/    # Telemetry ingestion service
 │   ├── MedicineTrack.Medication.Data/      # Medication domain models
 │   ├── MedicineTrack.Configuration.Data/   # Configuration domain models
 │   ├── MedicineTrack.Medication.Migrations/    # Database migrations
 │   ├── MedicineTrack.Configuration.Migrations/ # Database migrations
 │   ├── MedicineTrack.Tests/                # Unit tests
 │   └── MedicineTrack.End2EndTests/         # End-to-end tests
+├── scripts/
+│   ├── validate-ravendb-ingestion.sh       # RavenDB telemetry validation
+│   └── ravendb-test-queries.rql            # Example RQL queries
+├── otel-collector-config.yaml              # OpenTelemetry Collector config
 ├── deploy-aspire.sh                        # Kubernetes deployment script
 └── README.md
 ```
@@ -144,6 +161,8 @@ Supports various frequency types:
    - API Gateway: `http://localhost:5000`
    - Medicine API: `http://localhost:5001`
    - Configuration API: `http://localhost:5002`
+   - RavenDB Ingestion: `http://localhost:5003`
+   - RavenDB Studio: `https://ravendb.ravendb.orb.local/studio/index.html`
 
 ### API Documentation
 
@@ -290,6 +309,7 @@ The API Gateway uses YARP for reverse proxy functionality. Routes are configured
 - Gateway: `GET /health`
 - Medicine API: `GET /health`
 - Configuration API: `GET /health`
+- RavenDB Ingestion: `GET http://localhost:5003/health`
 
 ### Aspire Dashboard
 The Aspire dashboard provides comprehensive monitoring:
@@ -299,6 +319,166 @@ The Aspire dashboard provides comprehensive monitoring:
 - Resource utilization
 
 Access at: `http://localhost:15888` (development) or via port forwarding (Kubernetes)
+
+### Telemetry with RavenDB
+
+MedicineTrack uses OpenTelemetry and RavenDB for comprehensive telemetry storage and analysis.
+
+#### Architecture
+
+```
+Services (Gateway, API, Config)
+    │
+    │ OTLP (gRPC/HTTP)
+    ↓
+OpenTelemetry Collector (4317/4318)
+    │
+    │ File Export / HTTP POST
+    ↓
+RavenDB Ingestion Service (5003)
+    │
+    │ RavenDB.Client
+    ↓
+RavenDB (https://ravendb.ravendb.orb.local)
+    └── Database: telemetry
+        ├── Traces Collection
+        ├── Requests Collection
+        ├── Dependencies Collection
+        └── Exceptions Collection
+```
+
+#### RavenDB Setup
+
+1. **Prerequisites**
+   - RavenDB instance running at `https://ravendb.ravendb.orb.local`
+   - Database named `telemetry` created in RavenDB Studio
+
+2. **Configuration**
+
+   The RavenDB connection can be configured via environment variables or `appsettings.json`:
+
+   ```json
+   {
+     "RavenDB": {
+       "Url": "https://ravendb.ravendb.orb.local",
+       "Database": "telemetry"
+     }
+   }
+   ```
+
+   Or via environment variables:
+   ```bash
+   export RavenDB__Url="https://ravendb.ravendb.orb.local"
+   export RavenDB__Database="telemetry"
+   ```
+
+3. **Accessing RavenDB Studio**
+
+   Open RavenDB Studio to query and visualize telemetry data:
+   ```
+   https://ravendb.ravendb.orb.local/studio/index.html
+   ```
+
+#### Telemetry Collections
+
+**Traces Collection** - Application logs and structured traces
+```rql
+from Traces
+where Timestamp > @now.AddMinutes(-10)
+order by Timestamp desc
+```
+
+**Requests Collection** - HTTP requests to services
+```rql
+from Requests
+where Success == false
+order by Timestamp desc
+```
+
+**Dependencies Collection** - External calls (database, HTTP)
+```rql
+from Dependencies
+where DurationMs > 100
+order by DurationMs desc
+```
+
+**Exceptions Collection** - Application errors
+```rql
+from Exceptions
+group by InnermostType
+select InnermostType, count() as ErrorCount
+order by ErrorCount desc
+```
+
+#### Distributed Tracing
+
+Query across services using OperationId (trace ID):
+```rql
+from index 'Telemetry/ByTraceId'
+where OperationId == "your-trace-id-here"
+order by Timestamp asc
+```
+
+This returns all telemetry (traces, requests, dependencies) for a single request across all services.
+
+#### Query Examples
+
+See `scripts/ravendb-test-queries.rql` for comprehensive query examples:
+- Recent traces (health check)
+- Request volume by service
+- Slow dependencies
+- Exception summary
+- Error rate by service
+- Request duration percentiles
+- Service-to-service call map
+
+#### Validation
+
+Run the validation script to test telemetry ingestion:
+```bash
+bash scripts/validate-ravendb-ingestion.sh
+```
+
+This script:
+1. Tests RavenDB connection
+2. Verifies collection existence
+3. Generates test traffic
+4. Validates data ingestion
+5. Checks schema compliance
+6. Tests distributed tracing
+7. Verifies custom indexes
+
+#### Custom Indexes
+
+The system includes custom RavenDB indexes for optimized queries:
+
+- **Traces/ByServiceAndTime** - Filter traces by service and time range
+- **Requests/ByServiceAndStatus** - Analyze request success rates
+- **Telemetry/ByTraceId** - Multi-map index for distributed tracing
+
+Indexes are automatically deployed on service startup.
+
+#### Troubleshooting
+
+**Connection Issues**
+```bash
+# Test RavenDB connection
+curl -k https://ravendb.ravendb.orb.local/databases/telemetry/stats
+
+# Check ingestion service health
+curl http://localhost:5003/health
+```
+
+**No Data in RavenDB**
+- Verify OTEL Collector is running (check Aspire dashboard)
+- Check RavenDB Ingestion service logs for errors
+- Ensure 'telemetry' database exists in RavenDB Studio
+- Collections are created automatically on first insert
+
+**Query Performance**
+- Check index status in RavenDB Studio (Databases → telemetry → Indexes)
+- Indexes build asynchronously - wait a few moments after service start
+- Use index queries (`from index 'IndexName'`) for better performance
 
 ## 🤝 Contributing
 
