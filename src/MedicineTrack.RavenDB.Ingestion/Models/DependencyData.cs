@@ -1,12 +1,14 @@
-namespace MedicineTrack.Kusto.Ingestion.Models;
+namespace MedicineTrack.RavenDB.Ingestion.Models;
 
 /// <summary>
-/// Application Insights request schema for HTTP requests
+/// Application Insights dependency schema for external calls (database, HTTP, etc.)
 /// </summary>
-public record RequestData(
+public record DependencyData(
     DateTimeOffset Timestamp,
     string Name,
-    string? Url,
+    string Type,
+    string? Target,
+    string? Data,
     string Success,
     string? ResultCode,
     double Duration,
@@ -15,6 +17,5 @@ public record RequestData(
     string CloudRoleName,
     string? CloudRoleInstance,
     Dictionary<string, object?>? CustomDimensions,
-    Dictionary<string, double>? CustomMeasurements,
     string ItemType
 );

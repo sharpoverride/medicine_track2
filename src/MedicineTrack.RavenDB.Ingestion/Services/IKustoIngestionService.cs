@@ -1,6 +1,6 @@
-using MedicineTrack.Kusto.Ingestion.Models;
+using MedicineTrack.RavenDB.Ingestion.Models;
 
-namespace MedicineTrack.Kusto.Ingestion.Services;
+namespace MedicineTrack.RavenDB.Ingestion.Services;
 
 /// <summary>
 /// Service for ingesting telemetry data into Kusto

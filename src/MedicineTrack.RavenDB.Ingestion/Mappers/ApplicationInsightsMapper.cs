@@ -1,7 +1,7 @@
-using MedicineTrack.Kusto.Ingestion.Models;
+using MedicineTrack.RavenDB.Ingestion.Models;
 using System.Text.Json;
 
-namespace MedicineTrack.Kusto.Ingestion.Mappers;
+namespace MedicineTrack.RavenDB.Ingestion.Mappers;
 
 /// <summary>
 /// Maps OpenTelemetry data (from JSON export) to Application Insights schema

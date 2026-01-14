@@ -1,4 +1,4 @@
-namespace MedicineTrack.Kusto.Ingestion.Models;
+namespace MedicineTrack.RavenDB.Ingestion.Models;
 
 /// <summary>
 /// Application Insights exception schema for errors

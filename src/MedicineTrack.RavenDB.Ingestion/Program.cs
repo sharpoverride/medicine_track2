@@ -1,5 +1,5 @@
-using MedicineTrack.Kusto.Ingestion.Models;
-using MedicineTrack.Kusto.Ingestion.Services;
+using MedicineTrack.RavenDB.Ingestion.Models;
+using MedicineTrack.RavenDB.Ingestion.Services;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Trace;
 
@@ -20,7 +20,7 @@ builder.Services.AddOpenTelemetry()
         .AddHttpClientInstrumentation()
         .AddOtlpExporter());
 
-// Add Kusto ingestion service
+// Add RavenDB ingestion service
 builder.Services.AddSingleton<IKustoIngestionService, KustoIngestionService>();
 
 var app = builder.Build();
@@ -28,7 +28,7 @@ var app = builder.Build();
 var logger = app.Logger;
 
 // Health check endpoint
-app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "kusto-ingestion" }))
+app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "ravendb-ingestion" }))
     .WithName("HealthCheck")
     .WithTags("Health");
 
@@ -141,7 +141,7 @@ app.MapPost("/ingest/exceptions", async (
 .Produces(StatusCodes.Status200OK)
 .Produces(StatusCodes.Status500InternalServerError);
 
-logger.LogInformation("Kusto Ingestion service started. Endpoints available:");
+logger.LogInformation("RavenDB Ingestion service started. Endpoints available:");
 logger.LogInformation("  - POST /ingest/traces");
 logger.LogInformation("  - POST /ingest/requests");
 logger.LogInformation("  - POST /ingest/dependencies");

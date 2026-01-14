@@ -1,11 +1,11 @@
 using Kusto.Data;
 using Kusto.Data.Common;
 using Kusto.Data.Net.Client;
-using MedicineTrack.Kusto.Ingestion.Models;
+using MedicineTrack.RavenDB.Ingestion.Models;
 using System.Text;
 using System.Text.Json;
 
-namespace MedicineTrack.Kusto.Ingestion.Services;
+namespace MedicineTrack.RavenDB.Ingestion.Services;
 
 /// <summary>
 /// Implements telemetry ingestion into Kusto using inline commands

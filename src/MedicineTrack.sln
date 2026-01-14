@@ -27,7 +27,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MedicineTrack.End2EndTests.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MedicineTrack.Kusto.Init", "MedicineTrack.Kusto.Init\MedicineTrack.Kusto.Init.csproj", "{BAD92D2E-FA44-4AC3-8062-91338BEEE243}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MedicineTrack.Kusto.Ingestion", "MedicineTrack.Kusto.Ingestion\MedicineTrack.Kusto.Ingestion.csproj", "{69EC8338-4DBC-4E51-BA83-E3E74717C022}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MedicineTrack.RavenDB.Ingestion", "MedicineTrack.RavenDB.Ingestion\MedicineTrack.RavenDB.Ingestion.csproj", "{69EC8338-4DBC-4E51-BA83-E3E74717C022}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
