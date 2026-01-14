@@ -1,7 +1,20 @@
 #!/bin/bash
 
+# DEPRECATED: This script is for the old Kusto implementation
+# Use validate-ravendb-ingestion.sh instead
+#
 # Kusto Ingestion Validation Script
 # Validates that telemetry data is flowing from services → OTEL Collector → Kusto
+
+echo "============================================"
+echo "WARNING: This script is DEPRECATED"
+echo "============================================"
+echo "The project has migrated from Kusto to RavenDB."
+echo "Please use: scripts/validate-ravendb-ingestion.sh"
+echo ""
+echo "Continuing with Kusto validation (will likely fail)..."
+echo ""
+sleep 3
 
 set -e
 
