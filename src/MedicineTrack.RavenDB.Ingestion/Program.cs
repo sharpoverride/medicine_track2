@@ -100,13 +100,22 @@ app.MapPost("/v1/traces", async (
 {
     try
     {
-        // Decompress if gzip-encoded (OTEL Collector compresses by default)
-        Stream requestBody = context.Request.Body;
-        var contentEncoding = context.Request.Headers.ContentEncoding.ToString();
+        // Read request body into memory to detect gzip compression
+        using var memoryStream = new MemoryStream();
+        await context.Request.Body.CopyToAsync(memoryStream, cancellationToken);
+        memoryStream.Position = 0;
 
-        if (contentEncoding.Contains("gzip", StringComparison.OrdinalIgnoreCase))
+        Stream requestBody = memoryStream;
+
+        // Check for gzip magic bytes (0x1F 0x8B) at start of stream
+        byte[] buffer = new byte[2];
+        int bytesRead = await memoryStream.ReadAsync(buffer, cancellationToken);
+        memoryStream.Position = 0;
+
+        if (bytesRead >= 2 && buffer[0] == 0x1F && buffer[1] == 0x8B)
         {
-            requestBody = new GZipStream(requestBody, CompressionMode.Decompress);
+            logger.LogDebug("Detected gzip-compressed payload, decompressing");
+            requestBody = new GZipStream(memoryStream, CompressionMode.Decompress);
         }
 
         // Manually deserialize to get better error messages
@@ -174,13 +183,22 @@ app.MapPost("/v1/logs", async (
 {
     try
     {
-        // Decompress if gzip-encoded (OTEL Collector compresses by default)
-        Stream requestBody = context.Request.Body;
-        var contentEncoding = context.Request.Headers.ContentEncoding.ToString();
+        // Read request body into memory to detect gzip compression
+        using var memoryStream = new MemoryStream();
+        await context.Request.Body.CopyToAsync(memoryStream, cancellationToken);
+        memoryStream.Position = 0;
 
-        if (contentEncoding.Contains("gzip", StringComparison.OrdinalIgnoreCase))
+        Stream requestBody = memoryStream;
+
+        // Check for gzip magic bytes (0x1F 0x8B) at start of stream
+        byte[] buffer = new byte[2];
+        int bytesRead = await memoryStream.ReadAsync(buffer, cancellationToken);
+        memoryStream.Position = 0;
+
+        if (bytesRead >= 2 && buffer[0] == 0x1F && buffer[1] == 0x8B)
         {
-            requestBody = new GZipStream(requestBody, CompressionMode.Decompress);
+            logger.LogDebug("Detected gzip-compressed payload, decompressing");
+            requestBody = new GZipStream(memoryStream, CompressionMode.Decompress);
         }
 
         // Manually deserialize to get better error messages
