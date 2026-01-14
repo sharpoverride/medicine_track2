@@ -9,27 +9,16 @@ var postgres = builder.AddPostgres("postgresdb");
 var medicationDb = postgres.AddDatabase("medicationdb");
 var configurationDb = postgres.AddDatabase("configurationdb");
 
-// Kusto emulator for telemetry data
-var kusto = builder.AddContainer("kusto-emulator", "mcr.microsoft.com/azuredataexplorer/kustainer-linux")
-    .WithImageTag("latest")
-    .WithHttpEndpoint(port: 8080, targetPort: 8080, name: "kusto-http")
-    .WithEnvironment("ACCEPT_EULA", "Y")
-    .WithBindMount("./kusto-data", "/kustodata")
-    .WithArgs("--memory", "4g");
-
 // OpenTelemetry Collector for telemetry aggregation
 var otelCollector = builder.AddContainer("otel-collector", "otel/opentelemetry-collector-contrib")
     .WithImageTag("latest")
     .WithHttpEndpoint(port: 4318, targetPort: 4318, name: "otlp-http")
     .WithHttpEndpoint(port: 4317, targetPort: 4317, name: "otlp-grpc")
     .WithBindMount("../otel-collector-config.yaml", "/etc/otelcol-contrib/config.yaml")
-    .WithBindMount("./otel-data", "/var/otel")
-    .WaitFor(kusto);
+    .WithBindMount("./otel-data", "/var/otel");
 
-// RavenDB Ingestion bridge service
+// RavenDB Ingestion service
 var ravenDbIngestion = builder.AddProject<Projects.MedicineTrack_RavenDB_Ingestion>("ravendb-ingestion")
-    .WithEnvironment("Kusto__ConnectionString", "http://kusto-emulator:8080")
-    .WaitFor(kusto)
     .WithHttpEndpoint(port: 5003, name: "ingestion-http");
 
 // Migration projects - run these first to set up databases
