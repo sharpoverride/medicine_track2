@@ -19,9 +19,9 @@ var otelCollector = builder.AddContainer("otel-collector", "otel/opentelemetry-c
 
 // RavenDB Ingestion service
 // Configure RavenDB connection (external RavenDB instance)
-// Note: Service runs on host via Aspire, so .orb.local domains are accessible
+// Note: Using HTTP localhost since service runs on host (HTTPS via Tailscale has TLS issues)
 var ravenDbUrl = builder.Configuration["RavenDB:Url"]
-    ?? "https://ravendb.ravendb.orb.local";
+    ?? "http://localhost:8081";
 var ravenDbDatabase = builder.Configuration["RavenDB:Database"]
     ?? "telemetry";
 
