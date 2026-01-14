@@ -41,19 +41,19 @@ var configurationMigrations = builder
     .WithArgs("migrate");
 
 // Application services - wait for migrations to complete
-// Configure to send telemetry to custom OTEL Collector
+// Configure to send telemetry to custom OTEL Collector (gRPC on port 4317)
 var apiService = builder.AddProject<Projects.MedicineTrack_Api>("medicine-track-api")
     .WithReference(valkeyCache)
     .WithReference(medicationDb)
     .WaitFor(medicationMigrations)
-    .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318")
+    .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
     .WithHttpEndpoint(port: 5001, name: "api-http");
 
 var configService = builder.AddProject<Projects.MedicineTrack_Configuration>("medicine-track-config")
     .WithReference(valkeyCache)
     .WithReference(configurationDb)
     .WaitFor(configurationMigrations)
-    .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318")
+    .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
     .WithHttpEndpoint(port: 5002, name: "config-http");
 
 // API Gateway - references the backend services
@@ -62,7 +62,7 @@ var gatewayService = builder.AddProject<Projects.MedicineTrack_Gateway>("medicin
     .WithReference(configService)
     .WaitFor(apiService)
     .WaitFor(configService)
-    .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318")
+    .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
     .WithHttpEndpoint(port: 5000, name: "gateway-http");
 
 var end2endTestsRunner = builder
