@@ -1,15 +1,24 @@
 using System.Net;
 using System.Net.Security;
+using System.Text.Json;
 using MedicineTrack.RavenDB.Ingestion.Indexes;
 using MedicineTrack.RavenDB.Ingestion.Models;
 using MedicineTrack.RavenDB.Ingestion.Models.Otlp;
 using MedicineTrack.RavenDB.Ingestion.Services;
+using Microsoft.AspNetCore.Http.Json;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Trace;
 using Raven.Client.Documents;
 using Raven.Client.Documents.Indexes;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure JSON options for OTLP compatibility (camelCase)
+builder.Services.Configure<JsonOptions>(options =>
+{
+    options.SerializerOptions.PropertyNameCaseInsensitive = true;
+    options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+});
 
 // Add OpenTelemetry
 builder.Logging.AddOpenTelemetry(options =>
@@ -88,13 +97,30 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "rave
 
 // OTLP standard endpoints (for OpenTelemetry Collector)
 app.MapPost("/v1/traces", async (
-    OtlpTraceRequest otlpRequest,
+    HttpContext context,
     IRavenDBIngestionService ingestionService,
     ILogger<Program> logger,
     CancellationToken cancellationToken) =>
 {
     try
     {
+        // Manually deserialize to get better error messages
+        OtlpTraceRequest? otlpRequest;
+        try
+        {
+            otlpRequest = await context.Request.ReadFromJsonAsync<OtlpTraceRequest>(cancellationToken);
+            if (otlpRequest == null)
+            {
+                logger.LogWarning("Received null OTLP trace request");
+                return Results.BadRequest(new { error = "Request body is null" });
+            }
+        }
+        catch (JsonException jsonEx)
+        {
+            logger.LogError(jsonEx, "Failed to deserialize OTLP trace request");
+            return Results.BadRequest(new { error = "Invalid JSON format", details = jsonEx.Message });
+        }
+
         logger.LogInformation("Received OTLP traces with {Count} resource spans", otlpRequest.ResourceSpans.Count);
 
         var (traces, requests) = OtlpMapper.MapTraces(otlpRequest);
@@ -129,13 +155,30 @@ app.MapPost("/v1/traces", async (
 .Produces(StatusCodes.Status500InternalServerError);
 
 app.MapPost("/v1/logs", async (
-    OtlpLogsRequest otlpRequest,
+    HttpContext context,
     IRavenDBIngestionService ingestionService,
     ILogger<Program> logger,
     CancellationToken cancellationToken) =>
 {
     try
     {
+        // Manually deserialize to get better error messages
+        OtlpLogsRequest? otlpRequest;
+        try
+        {
+            otlpRequest = await context.Request.ReadFromJsonAsync<OtlpLogsRequest>(cancellationToken);
+            if (otlpRequest == null)
+            {
+                logger.LogWarning("Received null OTLP logs request");
+                return Results.BadRequest(new { error = "Request body is null" });
+            }
+        }
+        catch (JsonException jsonEx)
+        {
+            logger.LogError(jsonEx, "Failed to deserialize OTLP logs request");
+            return Results.BadRequest(new { error = "Invalid JSON format", details = jsonEx.Message });
+        }
+
         logger.LogInformation("Received OTLP logs with {Count} resource logs", otlpRequest.ResourceLogs.Count);
 
         var traces = OtlpMapper.MapLogs(otlpRequest);
