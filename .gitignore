@@ -104,9 +104,9 @@ Thumbs.db
 # macOS
 .DS_Store
 
-# Kusto emulator data
-kusto-data/
-src/MedicineTrack.AppHost/kusto-data/
+# Kusto emulator data (deprecated - migrated to RavenDB)
+# kusto-data/
+# src/MedicineTrack.AppHost/kusto-data/
 
 # OpenTelemetry Collector data
 otel-data/
