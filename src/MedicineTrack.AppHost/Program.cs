@@ -17,6 +17,15 @@ var kusto = builder.AddContainer("kusto-emulator", "mcr.microsoft.com/azuredatae
     .WithBindMount("./kusto-data", "/kustodata")
     .WithArgs("--memory", "4g");
 
+// OpenTelemetry Collector for telemetry aggregation
+var otelCollector = builder.AddContainer("otel-collector", "otel/opentelemetry-collector-contrib")
+    .WithImageTag("latest")
+    .WithHttpEndpoint(port: 4318, targetPort: 4318, name: "otlp-http")
+    .WithHttpEndpoint(port: 4317, targetPort: 4317, name: "otlp-grpc")
+    .WithBindMount("../otel-collector-config.yaml", "/etc/otelcol-contrib/config.yaml")
+    .WithBindMount("./otel-data", "/var/otel")
+    .WaitFor(kusto);
+
 // Migration projects - run these first to set up databases
 var medicationMigrations = builder.AddProject<Projects.MedicineTrack_Medication_Migrations>("medication-migrations")
     .WithReference(medicationDb)
