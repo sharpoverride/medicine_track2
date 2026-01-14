@@ -4,20 +4,20 @@ using System.Text.Json;
 namespace MedicineTrack.RavenDB.Ingestion.Mappers;
 
 /// <summary>
-/// Maps OpenTelemetry data (from JSON export) to Application Insights schema
+/// Maps OpenTelemetry data (from JSON export) to RavenDB document models
 /// </summary>
 public static class ApplicationInsightsMapper
 {
     /// <summary>
-    /// Map JSON log record to TraceData (Application Insights schema)
+    /// Map JSON log record to TraceDocument (RavenDB schema)
     /// </summary>
-    public static TraceData? MapLogRecordFromJson(JsonElement logElement)
+    public static TraceDocument? MapLogRecordFromJson(JsonElement logElement)
     {
         try
         {
             var timestamp = logElement.TryGetProperty("timeUnixNano", out var tsElement)
-                ? DateTimeOffset.FromUnixTimeMilliseconds(tsElement.GetInt64() / 1_000_000)
-                : DateTimeOffset.UtcNow;
+                ? DateTimeOffset.FromUnixTimeMilliseconds(tsElement.GetInt64() / 1_000_000).UtcDateTime
+                : DateTime.UtcNow;
 
             var body = logElement.TryGetProperty("body", out var bodyElement)
                 ? bodyElement.GetProperty("stringValue").GetString() ?? ""
@@ -33,19 +33,28 @@ public static class ApplicationInsightsMapper
             var attributes = ExtractAttributes(logElement);
             var resource = ExtractResourceAttributes(logElement);
 
-            return new TraceData(
-                Timestamp: timestamp,
-                Message: body,
-                SeverityLevel: severityLevel,
-                OperationName: attributes.GetValueOrDefault("operation.name")?.ToString(),
-                OperationId: logElement.TryGetProperty("traceId", out var traceIdEl)
+            var spanId = logElement.TryGetProperty("spanId", out var spanIdEl)
+                ? spanIdEl.GetString()
+                : null;
+
+            // Note: Log records typically don't have parentSpanId in OTLP format
+
+            return new TraceDocument
+            {
+                Timestamp = timestamp,
+                Message = body,
+                SeverityLevel = severityLevel,
+                OperationName = attributes.GetValueOrDefault("operation.name")?.ToString(),
+                OperationId = logElement.TryGetProperty("traceId", out var traceIdEl)
                     ? traceIdEl.GetString() ?? "unknown"
                     : "unknown",
-                CloudRoleName: resource.GetValueOrDefault("service.name")?.ToString() ?? "unknown",
-                CloudRoleInstance: resource.GetValueOrDefault("service.instance.id")?.ToString(),
-                CustomDimensions: attributes,
-                ItemType: "trace"
-            );
+                SpanId = spanId,
+                ParentSpanId = null,
+                CloudRoleName = resource.GetValueOrDefault("service.name")?.ToString() ?? "unknown",
+                CloudRoleInstance = resource.GetValueOrDefault("service.instance.id")?.ToString(),
+                CustomDimensions = ConvertToStringDictionary(attributes),
+                ItemType = "trace"
+            };
         }
         catch
         {
@@ -54,9 +63,9 @@ public static class ApplicationInsightsMapper
     }
 
     /// <summary>
-    /// Map JSON span to RequestData (HTTP requests)
+    /// Map JSON span to RequestDocument (HTTP requests)
     /// </summary>
-    public static RequestData? MapSpanToRequest(JsonElement spanElement)
+    public static RequestDocument? MapSpanToRequest(JsonElement spanElement)
     {
         try
         {
@@ -65,11 +74,11 @@ public static class ApplicationInsightsMapper
                 return null;
 
             var startTime = spanElement.TryGetProperty("startTimeUnixNano", out var startElement)
-                ? DateTimeOffset.FromUnixTimeMilliseconds(startElement.GetInt64() / 1_000_000)
-                : DateTimeOffset.UtcNow;
+                ? DateTimeOffset.FromUnixTimeMilliseconds(startElement.GetInt64() / 1_000_000).UtcDateTime
+                : DateTime.UtcNow;
 
             var endTime = spanElement.TryGetProperty("endTimeUnixNano", out var endElement)
-                ? DateTimeOffset.FromUnixTimeMilliseconds(endElement.GetInt64() / 1_000_000)
+                ? DateTimeOffset.FromUnixTimeMilliseconds(endElement.GetInt64() / 1_000_000).UtcDateTime
                 : startTime;
 
             var duration = (endTime - startTime).TotalMilliseconds;
@@ -87,25 +96,31 @@ public static class ApplicationInsightsMapper
             var statusCode = attributes.GetValueOrDefault("http.status_code")?.ToString()
                 ?? attributes.GetValueOrDefault("http.response.status_code")?.ToString();
 
-            var success = DetermineSuccess(statusCode);
+            var success = DetermineSuccessBool(statusCode);
 
-            return new RequestData(
-                Timestamp: startTime,
-                Name: name,
-                Url: url,
-                Success: success,
-                ResultCode: statusCode,
-                Duration: duration,
-                OperationName: name,
-                OperationId: spanElement.TryGetProperty("traceId", out var traceIdEl)
+            var spanId = spanElement.TryGetProperty("spanId", out var spanIdEl)
+                ? spanIdEl.GetString()
+                : null;
+
+            return new RequestDocument
+            {
+                Timestamp = startTime,
+                Name = name,
+                Url = url,
+                Success = success,
+                ResultCode = statusCode,
+                DurationMs = duration,
+                OperationName = name,
+                OperationId = spanElement.TryGetProperty("traceId", out var traceIdEl)
                     ? traceIdEl.GetString() ?? "unknown"
                     : "unknown",
-                CloudRoleName: resource.GetValueOrDefault("service.name")?.ToString() ?? "unknown",
-                CloudRoleInstance: resource.GetValueOrDefault("service.instance.id")?.ToString(),
-                CustomDimensions: attributes,
-                CustomMeasurements: null,
-                ItemType: "request"
-            );
+                SpanId = spanId,
+                CloudRoleName = resource.GetValueOrDefault("service.name")?.ToString() ?? "unknown",
+                CloudRoleInstance = resource.GetValueOrDefault("service.instance.id")?.ToString(),
+                CustomDimensions = ConvertToStringDictionary(attributes),
+                CustomMeasurements = null,
+                ItemType = "request"
+            };
         }
         catch
         {
@@ -114,9 +129,9 @@ public static class ApplicationInsightsMapper
     }
 
     /// <summary>
-    /// Map JSON span to DependencyData (external calls)
+    /// Map JSON span to DependencyDocument (external calls)
     /// </summary>
-    public static DependencyData? MapSpanToDependency(JsonElement spanElement)
+    public static DependencyDocument? MapSpanToDependency(JsonElement spanElement)
     {
         try
         {
@@ -129,11 +144,11 @@ public static class ApplicationInsightsMapper
                 return null;
 
             var startTime = spanElement.TryGetProperty("startTimeUnixNano", out var startElement)
-                ? DateTimeOffset.FromUnixTimeMilliseconds(startElement.GetInt64() / 1_000_000)
-                : DateTimeOffset.UtcNow;
+                ? DateTimeOffset.FromUnixTimeMilliseconds(startElement.GetInt64() / 1_000_000).UtcDateTime
+                : DateTime.UtcNow;
 
             var endTime = spanElement.TryGetProperty("endTimeUnixNano", out var endElement)
-                ? DateTimeOffset.FromUnixTimeMilliseconds(endElement.GetInt64() / 1_000_000)
+                ? DateTimeOffset.FromUnixTimeMilliseconds(endElement.GetInt64() / 1_000_000).UtcDateTime
                 : startTime;
 
             var duration = (endTime - startTime).TotalMilliseconds;
@@ -153,26 +168,32 @@ public static class ApplicationInsightsMapper
             var statusCode = attributes.GetValueOrDefault("http.status_code")?.ToString()
                 ?? attributes.GetValueOrDefault("db.response_status_code")?.ToString();
 
-            var success = DetermineSuccess(statusCode);
+            var success = DetermineSuccessBool(statusCode);
 
-            return new DependencyData(
-                Timestamp: startTime,
-                Name: name,
-                Type: type,
-                Target: target,
-                Data: data,
-                Success: success,
-                ResultCode: statusCode,
-                Duration: duration,
-                OperationName: name,
-                OperationId: spanElement.TryGetProperty("traceId", out var traceIdEl)
+            var spanId = spanElement.TryGetProperty("spanId", out var spanIdEl)
+                ? spanIdEl.GetString()
+                : null;
+
+            return new DependencyDocument
+            {
+                Timestamp = startTime,
+                Name = name,
+                Type = type,
+                Target = target,
+                Data = data,
+                Success = success,
+                ResultCode = statusCode,
+                DurationMs = duration,
+                OperationName = name,
+                OperationId = spanElement.TryGetProperty("traceId", out var traceIdEl)
                     ? traceIdEl.GetString() ?? "unknown"
                     : "unknown",
-                CloudRoleName: resource.GetValueOrDefault("service.name")?.ToString() ?? "unknown",
-                CloudRoleInstance: resource.GetValueOrDefault("service.instance.id")?.ToString(),
-                CustomDimensions: attributes,
-                ItemType: "dependency"
-            );
+                SpanId = spanId,
+                CloudRoleName = resource.GetValueOrDefault("service.name")?.ToString() ?? "unknown",
+                CloudRoleInstance = resource.GetValueOrDefault("service.instance.id")?.ToString(),
+                CustomDimensions = ConvertToStringDictionary(attributes),
+                ItemType = "dependency"
+            };
         }
         catch
         {
@@ -297,16 +318,36 @@ public static class ApplicationInsightsMapper
         };
     }
 
-    private static string DetermineSuccess(string? statusCode)
+    private static bool DetermineSuccessBool(string? statusCode)
     {
         if (string.IsNullOrEmpty(statusCode))
-            return "True";
+            return true;
 
         if (int.TryParse(statusCode, out var code))
         {
-            return code >= 200 && code < 400 ? "True" : "False";
+            return code >= 200 && code < 400;
         }
 
-        return "True"; // Default to success
+        return true; // Default to success
+    }
+
+    /// <summary>
+    /// Convert Dictionary<string, object?> to Dictionary<string, string> for RavenDB
+    /// </summary>
+    private static Dictionary<string, string>? ConvertToStringDictionary(Dictionary<string, object?> attributes)
+    {
+        if (attributes == null || attributes.Count == 0)
+            return null;
+
+        var result = new Dictionary<string, string>();
+        foreach (var kvp in attributes)
+        {
+            if (kvp.Value != null)
+            {
+                result[kvp.Key] = kvp.Value.ToString() ?? string.Empty;
+            }
+        }
+
+        return result.Count > 0 ? result : null;
     }
 }
