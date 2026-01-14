@@ -22,6 +22,7 @@
     <ProjectReference Include="..\MedicineTrack.Gateway\MedicineTrack.Gateway.csproj" />
     <ProjectReference Include="..\MedicineTrack.Configuration\MedicineTrack.Configuration.csproj" />
     <ProjectReference Include="..\MedicineTrack.Medication.Migrations\MedicineTrack.Medication.Migrations.csproj" />
+    <ProjectReference Include="..\MedicineTrack.Kusto.Ingestion\MedicineTrack.Kusto.Ingestion.csproj" />
   </ItemGroup>
 
 </Project>

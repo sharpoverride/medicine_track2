@@ -26,6 +26,12 @@ var otelCollector = builder.AddContainer("otel-collector", "otel/opentelemetry-c
     .WithBindMount("./otel-data", "/var/otel")
     .WaitFor(kusto);
 
+// Kusto Ingestion bridge service
+var kustoIngestion = builder.AddProject<Projects.MedicineTrack_Kusto_Ingestion>("kusto-ingestion")
+    .WithEnvironment("Kusto__ConnectionString", "http://kusto-emulator:8080")
+    .WaitFor(kusto)
+    .WithHttpEndpoint(port: 5003, name: "ingestion-http");
+
 // Migration projects - run these first to set up databases
 var medicationMigrations = builder.AddProject<Projects.MedicineTrack_Medication_Migrations>("medication-migrations")
     .WithReference(medicationDb)
