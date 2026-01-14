@@ -14,8 +14,8 @@ var otelCollector = builder.AddContainer("otel-collector", "otel/opentelemetry-c
     .WithImageTag("latest")
     .WithHttpEndpoint(port: 4318, targetPort: 4318, name: "otlp-http")
     .WithHttpEndpoint(port: 4317, targetPort: 4317, name: "otlp-grpc")
-    .WithBindMount("../otel-collector-config.yaml", "/etc/otelcol-contrib/config.yaml")
-    .WithBindMount("./otel-data", "/var/otel");
+    .WithBindMount("../../otel-collector-config.yaml", "/etc/otelcol-contrib/config.yaml")
+    .WithBindMount("../../otel-data", "/var/otel");
 
 // RavenDB Ingestion service
 // Configure RavenDB connection (external RavenDB instance)
