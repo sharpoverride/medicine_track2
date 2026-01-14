@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Security;
 using MedicineTrack.RavenDB.Ingestion.Indexes;
 using MedicineTrack.RavenDB.Ingestion.Models;
 using MedicineTrack.RavenDB.Ingestion.Services;
@@ -48,6 +50,9 @@ builder.Services.AddSingleton<IDocumentStore>(sp =>
 
     // Allow self-signed certificates for development/local RavenDB instances
     store.Conventions.DisableTopologyUpdates = false;
+
+    // Configure to accept any SSL certificate (for development with IP addresses)
+    ServicePointManager.ServerCertificateValidationCallback += (sender, cert, chain, sslPolicyErrors) => true;
 
     try
     {

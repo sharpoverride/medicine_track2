@@ -19,8 +19,9 @@ var otelCollector = builder.AddContainer("otel-collector", "otel/opentelemetry-c
 
 // RavenDB Ingestion service
 // Configure RavenDB connection (external RavenDB instance)
+// Note: Using IP address instead of .orb.local domain for Docker container accessibility
 var ravenDbUrl = builder.Configuration["RavenDB:Url"]
-    ?? "https://ravendb.ravendb.orb.local";
+    ?? "https://192.168.138.8";
 var ravenDbDatabase = builder.Configuration["RavenDB:Database"]
     ?? "telemetry";
 
