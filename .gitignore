@@ -103,3 +103,15 @@ Thumbs.db
 
 # macOS
 .DS_Store
+
+# Kusto emulator data (deprecated - migrated to RavenDB)
+# kusto-data/
+# src/MedicineTrack.AppHost/kusto-data/
+
+# OpenTelemetry Collector data
+otel-data/
+src/MedicineTrack.AppHost/otel-data/
+telemetry.json*
+
+# Claude Code workflow state
+.claude/

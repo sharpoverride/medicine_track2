@@ -36,6 +36,17 @@ MedicineTrack follows a microservices architecture built on .NET Aspire, providi
 │ • Entity Framework Core (Data Access)                          │
 │ • Migrations (Database Schema Management)                       │
 └─────────────────────────────────────────────────────────────────┘
+                                    │
+┌─────────────────────────────────────────────────────────────────┐
+│                    Telemetry & Observability                     │
+│                                                                 │
+│ • OpenTelemetry Collector (OTLP: 4317/4318)                    │
+│ • ClickHouse (Telemetry Storage)                               │
+│   - otel_traces                                                │
+│   - otel_logs                                                  │
+│   - otel_metrics_*                                             │
+│ • Aspire Dashboard (Structured logs, traces, metrics)         │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ### Project Structure
@@ -53,6 +64,12 @@ medicine_track/
 │   ├── MedicineTrack.Configuration.Migrations/ # Database migrations
 │   ├── MedicineTrack.Tests/                # Unit tests
 │   └── MedicineTrack.End2EndTests/         # End-to-end tests
+├── scripts/
+│   ├── validate-clickhouse-ingestion.sh    # ClickHouse telemetry validation
+│   └── clickhouse-test-queries.sql         # Example ClickHouse queries
+├── clickhouse-init/                        # ClickHouse schema initialization
+├── clickhouse-config/                      # ClickHouse user/network config
+├── otel-collector-config.yaml              # OpenTelemetry Collector config
 ├── deploy-aspire.sh                        # Kubernetes deployment script
 └── README.md
 ```
@@ -144,6 +161,8 @@ Supports various frequency types:
    - API Gateway: `http://localhost:5000`
    - Medicine API: `http://localhost:5001`
    - Configuration API: `http://localhost:5002`
+   - ClickHouse HTTP: `http://localhost:8123`
+   - Aspire Dashboard: `https://localhost:17217` (or the URL printed by `aspire run`)
 
 ### API Documentation
 
@@ -290,6 +309,7 @@ The API Gateway uses YARP for reverse proxy functionality. Routes are configured
 - Gateway: `GET /health`
 - Medicine API: `GET /health`
 - Configuration API: `GET /health`
+- ClickHouse: `GET http://localhost:8123/ping`
 
 ### Aspire Dashboard
 The Aspire dashboard provides comprehensive monitoring:
@@ -299,6 +319,134 @@ The Aspire dashboard provides comprehensive monitoring:
 - Resource utilization
 
 Access at: `http://localhost:15888` (development) or via port forwarding (Kubernetes)
+### Telemetry with ClickHouse
+
+MedicineTrack uses OpenTelemetry and ClickHouse for comprehensive telemetry storage and analysis. The Aspire dashboard is also populated directly by the .NET services for structured logs, traces, and metrics.
+
+#### Architecture
+
+```
+Services (Gateway, API, Config, E2E Runner)
+    │
+    │ OTLP (gRPC) ─────────────────────┐
+    ↓                                    │
+OpenTelemetry Collector (4317/4318)      │
+    │                                    │
+    │ clickhouse exporter (HTTP 8123)    │
+    ↓                                    │
+ClickHouse (database: telemetry)         │
+    ├── otel_traces                      │
+    ├── otel_logs                        │
+    └── otel_metrics_*                   │
+                                         │
+    │ OTLP (gRPC) via Aspire DCP proxy   │
+    ↓                                    │
+Aspire Dashboard                         │
+    └── Structured logs, traces, metrics
+```
+
+#### ClickHouse Setup
+
+ClickHouse is started automatically by the Aspire AppHost. No manual setup is required. The schema is created automatically by the OpenTelemetry Collector ClickHouse exporter (`create_schema: true`).
+
+Access the ClickHouse HTTP interface at `http://localhost:8123` when the AppHost is running.
+
+#### Telemetry Tables
+
+**otel_traces** - Distributed traces and spans
+```sql
+SELECT *
+FROM telemetry.otel_traces
+WHERE Timestamp > now() - INTERVAL 10 MINUTE
+ORDER BY Timestamp DESC
+LIMIT 10
+```
+
+**otel_logs** - Structured application logs
+```sql
+SELECT *
+FROM telemetry.otel_logs
+WHERE SeverityText IN ('Error', 'Fatal')
+  AND Timestamp > now() - INTERVAL 1 HOUR
+ORDER BY Timestamp DESC
+```
+
+**otel_metrics_*** - Metric data points (`otel_metrics_sum`, `otel_metrics_histogram`, `otel_metrics_gauge`, etc.)
+
+#### Distributed Tracing
+
+Query across services using a TraceId:
+```sql
+SELECT
+    Timestamp,
+    ServiceName,
+    SpanName,
+    StatusCode,
+    Duration
+FROM telemetry.otel_traces
+WHERE TraceId = 'your-trace-id-here'
+ORDER BY Timestamp
+```
+
+This returns all spans for a single request across all services.
+
+#### Query Examples
+
+See `scripts/clickhouse-test-queries.sql` for comprehensive query examples:
+- Total traces per service
+- Error rate by service
+- Slowest spans
+- Logs by severity
+- Recent error logs
+- Metric points by service
+
+#### Validation
+
+Run the validation script to test telemetry ingestion:
+```bash
+bash scripts/validate-clickhouse-ingestion.sh
+```
+
+This script:
+1. Tests ClickHouse connectivity
+2. Verifies telemetry table existence
+3. Checks for recent trace data
+4. Checks for recent log data
+5. Checks for recent metric data
+6. Prints a sample of recent traces
+
+#### Aspire Dashboard
+
+The Aspire dashboard receives telemetry directly from each service and provides:
+- **Structured Logs** - Search and filter application logs
+- **Traces** - End-to-end distributed trace visualization
+- **Metrics** - Charts and metric exploration
+
+Access the dashboard URL printed by `aspire run` (e.g., `https://localhost:17217/login?t=<token>`).
+
+#### Troubleshooting
+
+**Connection Issues**
+```bash
+# Test ClickHouse connectivity
+curl http://localhost:8123/ping
+
+# Test OTEL Collector OTLP HTTP endpoint
+curl -X POST http://localhost:4318/v1/traces \
+  -H "Content-Type: application/x-protobuf" \
+  -d ''
+```
+
+**No Data in ClickHouse**
+- Verify the OTEL Collector container is running (check Aspire dashboard)
+- Check the ClickHouse exporter logs for connection errors
+- Ensure services are exporting to the collector (`OTEL_COLLECTOR_OTLP_GRPC` is set)
+- Tables are created automatically on first insert
+
+**Dashboard Tabs Are Empty**
+- Confirm each service calls `.WithOtlpExporter()` in the AppHost
+- Confirm services can reach the Aspire dashboard OTLP proxy (`https://localhost:21040` by default)
+- The Aspire dashboard OTLP endpoint requires traffic through the Aspire DCP proxy; external direct connections are rejected
 
 ## 🤝 Contributing
 
