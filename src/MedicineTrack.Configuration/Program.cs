@@ -2,9 +2,23 @@ using Microsoft.AspNetCore.Mvc;
 using System.Text.Json.Serialization;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Trace;
+using OpenTelemetry.Exporter;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Collector endpoint is injected by the AppHost as a service reference.
+var collectorEndpoint = builder.Configuration["OTEL_COLLECTOR_OTLP_GRPC"]
+    ?? builder.Configuration["services:otel-collector:otlp-grpc:0"];
+
+static void ConfigureCollectorExporter(OtlpExporterOptions options, string? endpoint)
+{
+    if (!string.IsNullOrEmpty(endpoint) && Uri.TryCreate(endpoint, UriKind.Absolute, out var uri))
+    {
+        options.Endpoint = uri;
+        options.Protocol = OtlpExportProtocol.Grpc;
+    }
+}
 
 // Add OpenTelemetry logging to feed Aspire dashboard structured logs
 builder.Logging.AddOpenTelemetry(options =>
@@ -12,7 +26,11 @@ builder.Logging.AddOpenTelemetry(options =>
     options.IncludeScopes = true;
     options.IncludeFormattedMessage = true;
     options.ParseStateValues = true;
-    options.AddOtlpExporter();
+    options.AddOtlpExporter(); // Dashboard
+    if (!string.IsNullOrEmpty(collectorEndpoint))
+    {
+        options.AddOtlpExporter(o => ConfigureCollectorExporter(o, collectorEndpoint));
+    }
 });
 // Enrich logs with Activity context so TraceId/SpanId are present in structured logs
 builder.Services.Configure<LoggerFactoryOptions>(o =>
@@ -26,7 +44,8 @@ builder.Services.AddOpenTelemetry()
         .AddAspNetCoreInstrumentation()
         .AddHttpClientInstrumentation()
         .AddSource("Npgsql")
-        .AddOtlpExporter());
+        .AddOtlpExporter() // Dashboard
+        .AddOtlpExporter(o => ConfigureCollectorExporter(o, collectorEndpoint)));
 
 // Add services to the container.
 builder.Services.AddOpenApi();

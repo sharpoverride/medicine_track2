@@ -41,12 +41,11 @@ MedicineTrack follows a microservices architecture built on .NET Aspire, providi
 │                    Telemetry & Observability                     │
 │                                                                 │
 │ • OpenTelemetry Collector (OTLP: 4317/4318)                    │
-│ • RavenDB Ingestion Service (Port 5003)                        │
-│ • RavenDB (Telemetry Storage)                                  │
-│   - Traces Collection (Application logs)                       │
-│   - Requests Collection (HTTP requests)                        │
-│   - Dependencies Collection (Database/HTTP calls)              │
-│   - Exceptions Collection (Application errors)                 │
+│ • ClickHouse (Telemetry Storage)                               │
+│   - otel_traces                                                │
+│   - otel_logs                                                  │
+│   - otel_metrics_*                                             │
+│ • Aspire Dashboard (Structured logs, traces, metrics)         │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -59,7 +58,6 @@ medicine_track/
 │   ├── MedicineTrack.Api/                  # Main API service
 │   ├── MedicineTrack.Configuration/        # Configuration service
 │   ├── MedicineTrack.Gateway/              # API Gateway (YARP)
-│   ├── MedicineTrack.RavenDB.Ingestion/    # Telemetry ingestion service
 │   ├── MedicineTrack.Medication.Data/      # Medication domain models
 │   ├── MedicineTrack.Configuration.Data/   # Configuration domain models
 │   ├── MedicineTrack.Medication.Migrations/    # Database migrations
@@ -67,8 +65,10 @@ medicine_track/
 │   ├── MedicineTrack.Tests/                # Unit tests
 │   └── MedicineTrack.End2EndTests/         # End-to-end tests
 ├── scripts/
-│   ├── validate-ravendb-ingestion.sh       # RavenDB telemetry validation
-│   └── ravendb-test-queries.rql            # Example RQL queries
+│   ├── validate-clickhouse-ingestion.sh    # ClickHouse telemetry validation
+│   └── clickhouse-test-queries.sql         # Example ClickHouse queries
+├── clickhouse-init/                        # ClickHouse schema initialization
+├── clickhouse-config/                      # ClickHouse user/network config
 ├── otel-collector-config.yaml              # OpenTelemetry Collector config
 ├── deploy-aspire.sh                        # Kubernetes deployment script
 └── README.md
@@ -161,8 +161,8 @@ Supports various frequency types:
    - API Gateway: `http://localhost:5000`
    - Medicine API: `http://localhost:5001`
    - Configuration API: `http://localhost:5002`
-   - RavenDB Ingestion: `http://localhost:5003`
-   - RavenDB Studio: `https://ravendb.ravendb.orb.local/studio/index.html`
+   - ClickHouse HTTP: `http://localhost:8123`
+   - Aspire Dashboard: `https://localhost:17217` (or the URL printed by `aspire run`)
 
 ### API Documentation
 
@@ -309,7 +309,7 @@ The API Gateway uses YARP for reverse proxy functionality. Routes are configured
 - Gateway: `GET /health`
 - Medicine API: `GET /health`
 - Configuration API: `GET /health`
-- RavenDB Ingestion: `GET http://localhost:5003/health`
+- ClickHouse: `GET http://localhost:8123/ping`
 
 ### Aspire Dashboard
 The Aspire dashboard provides comprehensive monitoring:
@@ -319,166 +319,134 @@ The Aspire dashboard provides comprehensive monitoring:
 - Resource utilization
 
 Access at: `http://localhost:15888` (development) or via port forwarding (Kubernetes)
+### Telemetry with ClickHouse
 
-### Telemetry with RavenDB
-
-MedicineTrack uses OpenTelemetry and RavenDB for comprehensive telemetry storage and analysis.
+MedicineTrack uses OpenTelemetry and ClickHouse for comprehensive telemetry storage and analysis. The Aspire dashboard is also populated directly by the .NET services for structured logs, traces, and metrics.
 
 #### Architecture
 
 ```
-Services (Gateway, API, Config)
+Services (Gateway, API, Config, E2E Runner)
     │
-    │ OTLP (gRPC/HTTP)
-    ↓
-OpenTelemetry Collector (4317/4318)
-    │
-    │ File Export / HTTP POST
-    ↓
-RavenDB Ingestion Service (5003)
-    │
-    │ RavenDB.Client
-    ↓
-RavenDB (https://ravendb.ravendb.orb.local)
-    └── Database: telemetry
-        ├── Traces Collection
-        ├── Requests Collection
-        ├── Dependencies Collection
-        └── Exceptions Collection
+    │ OTLP (gRPC) ─────────────────────┐
+    ↓                                    │
+OpenTelemetry Collector (4317/4318)      │
+    │                                    │
+    │ clickhouse exporter (HTTP 8123)    │
+    ↓                                    │
+ClickHouse (database: telemetry)         │
+    ├── otel_traces                      │
+    ├── otel_logs                        │
+    └── otel_metrics_*                   │
+                                         │
+    │ OTLP (gRPC) via Aspire DCP proxy   │
+    ↓                                    │
+Aspire Dashboard                         │
+    └── Structured logs, traces, metrics
 ```
 
-#### RavenDB Setup
+#### ClickHouse Setup
 
-1. **Prerequisites**
-   - RavenDB instance running at `https://ravendb.ravendb.orb.local`
-   - Database named `telemetry` created in RavenDB Studio
+ClickHouse is started automatically by the Aspire AppHost. No manual setup is required. The schema is created automatically by the OpenTelemetry Collector ClickHouse exporter (`create_schema: true`).
 
-2. **Configuration**
+Access the ClickHouse HTTP interface at `http://localhost:8123` when the AppHost is running.
 
-   The RavenDB connection can be configured via environment variables or `appsettings.json`:
+#### Telemetry Tables
 
-   ```json
-   {
-     "RavenDB": {
-       "Url": "https://ravendb.ravendb.orb.local",
-       "Database": "telemetry"
-     }
-   }
-   ```
-
-   Or via environment variables:
-   ```bash
-   export RavenDB__Url="https://ravendb.ravendb.orb.local"
-   export RavenDB__Database="telemetry"
-   ```
-
-3. **Accessing RavenDB Studio**
-
-   Open RavenDB Studio to query and visualize telemetry data:
-   ```
-   https://ravendb.ravendb.orb.local/studio/index.html
-   ```
-
-#### Telemetry Collections
-
-**Traces Collection** - Application logs and structured traces
-```rql
-from Traces
-where Timestamp > @now.AddMinutes(-10)
-order by Timestamp desc
+**otel_traces** - Distributed traces and spans
+```sql
+SELECT *
+FROM telemetry.otel_traces
+WHERE Timestamp > now() - INTERVAL 10 MINUTE
+ORDER BY Timestamp DESC
+LIMIT 10
 ```
 
-**Requests Collection** - HTTP requests to services
-```rql
-from Requests
-where Success == false
-order by Timestamp desc
+**otel_logs** - Structured application logs
+```sql
+SELECT *
+FROM telemetry.otel_logs
+WHERE SeverityText IN ('Error', 'Fatal')
+  AND Timestamp > now() - INTERVAL 1 HOUR
+ORDER BY Timestamp DESC
 ```
 
-**Dependencies Collection** - External calls (database, HTTP)
-```rql
-from Dependencies
-where DurationMs > 100
-order by DurationMs desc
-```
-
-**Exceptions Collection** - Application errors
-```rql
-from Exceptions
-group by InnermostType
-select InnermostType, count() as ErrorCount
-order by ErrorCount desc
-```
+**otel_metrics_*** - Metric data points (`otel_metrics_sum`, `otel_metrics_histogram`, `otel_metrics_gauge`, etc.)
 
 #### Distributed Tracing
 
-Query across services using OperationId (trace ID):
-```rql
-from index 'Telemetry/ByTraceId'
-where OperationId == "your-trace-id-here"
-order by Timestamp asc
+Query across services using a TraceId:
+```sql
+SELECT
+    Timestamp,
+    ServiceName,
+    SpanName,
+    StatusCode,
+    Duration
+FROM telemetry.otel_traces
+WHERE TraceId = 'your-trace-id-here'
+ORDER BY Timestamp
 ```
 
-This returns all telemetry (traces, requests, dependencies) for a single request across all services.
+This returns all spans for a single request across all services.
 
 #### Query Examples
 
-See `scripts/ravendb-test-queries.rql` for comprehensive query examples:
-- Recent traces (health check)
-- Request volume by service
-- Slow dependencies
-- Exception summary
+See `scripts/clickhouse-test-queries.sql` for comprehensive query examples:
+- Total traces per service
 - Error rate by service
-- Request duration percentiles
-- Service-to-service call map
+- Slowest spans
+- Logs by severity
+- Recent error logs
+- Metric points by service
 
 #### Validation
 
 Run the validation script to test telemetry ingestion:
 ```bash
-bash scripts/validate-ravendb-ingestion.sh
+bash scripts/validate-clickhouse-ingestion.sh
 ```
 
 This script:
-1. Tests RavenDB connection
-2. Verifies collection existence
-3. Generates test traffic
-4. Validates data ingestion
-5. Checks schema compliance
-6. Tests distributed tracing
-7. Verifies custom indexes
+1. Tests ClickHouse connectivity
+2. Verifies telemetry table existence
+3. Checks for recent trace data
+4. Checks for recent log data
+5. Checks for recent metric data
+6. Prints a sample of recent traces
 
-#### Custom Indexes
+#### Aspire Dashboard
 
-The system includes custom RavenDB indexes for optimized queries:
+The Aspire dashboard receives telemetry directly from each service and provides:
+- **Structured Logs** - Search and filter application logs
+- **Traces** - End-to-end distributed trace visualization
+- **Metrics** - Charts and metric exploration
 
-- **Traces/ByServiceAndTime** - Filter traces by service and time range
-- **Requests/ByServiceAndStatus** - Analyze request success rates
-- **Telemetry/ByTraceId** - Multi-map index for distributed tracing
-
-Indexes are automatically deployed on service startup.
+Access the dashboard URL printed by `aspire run` (e.g., `https://localhost:17217/login?t=<token>`).
 
 #### Troubleshooting
 
 **Connection Issues**
 ```bash
-# Test RavenDB connection
-curl -k https://ravendb.ravendb.orb.local/databases/telemetry/stats
+# Test ClickHouse connectivity
+curl http://localhost:8123/ping
 
-# Check ingestion service health
-curl http://localhost:5003/health
+# Test OTEL Collector OTLP HTTP endpoint
+curl -X POST http://localhost:4318/v1/traces \
+  -H "Content-Type: application/x-protobuf" \
+  -d ''
 ```
 
-**No Data in RavenDB**
-- Verify OTEL Collector is running (check Aspire dashboard)
-- Check RavenDB Ingestion service logs for errors
-- Ensure 'telemetry' database exists in RavenDB Studio
-- Collections are created automatically on first insert
+**No Data in ClickHouse**
+- Verify the OTEL Collector container is running (check Aspire dashboard)
+- Check the ClickHouse exporter logs for connection errors
+- Ensure services are exporting to the collector (`OTEL_COLLECTOR_OTLP_GRPC` is set)
+- Tables are created automatically on first insert
 
-**Query Performance**
-- Check index status in RavenDB Studio (Databases → telemetry → Indexes)
-- Indexes build asynchronously - wait a few moments after service start
-- Use index queries (`from index 'IndexName'`) for better performance
+**Dashboard Tabs Are Empty**
+- Confirm each service calls `.WithOtlpExporter()` in the AppHost
+- Confirm services can reach the Aspire dashboard OTLP proxy (`https://localhost:21040` by default)
+- The Aspire dashboard OTLP endpoint requires traffic through the Aspire DCP proxy; external direct connections are rejected
 
 ## 🤝 Contributing
 

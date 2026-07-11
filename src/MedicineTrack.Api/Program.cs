@@ -7,11 +7,25 @@ using MedicineTrack.Medication.Data.Models;
 using MedicineTrack.Configuration.Data.Models;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Trace;
+using OpenTelemetry.Exporter;
 using Npgsql;
 using FluentValidation;
 using MedicineTrack.Api.Validators;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Collector endpoint is injected by the AppHost as a service reference.
+var collectorEndpoint = builder.Configuration["OTEL_COLLECTOR_OTLP_GRPC"]
+    ?? builder.Configuration["services:otel-collector:otlp-grpc:0"];
+
+static void ConfigureCollectorExporter(OtlpExporterOptions options, string? endpoint)
+{
+    if (!string.IsNullOrEmpty(endpoint) && Uri.TryCreate(endpoint, UriKind.Absolute, out var uri))
+    {
+        options.Endpoint = uri;
+        options.Protocol = OtlpExportProtocol.Grpc;
+    }
+}
 
 // Add OpenTelemetry logging to feed Aspire dashboard structured logs
 builder.Logging.AddOpenTelemetry(options =>
@@ -19,7 +33,11 @@ builder.Logging.AddOpenTelemetry(options =>
     options.IncludeScopes = true;
     options.IncludeFormattedMessage = true;
     options.ParseStateValues = true;
-    options.AddOtlpExporter(); // Honors OTEL_* env vars provided by Aspire
+    options.AddOtlpExporter(); // Honors OTEL_* env vars provided by Aspire (dashboard)
+    if (!string.IsNullOrEmpty(collectorEndpoint))
+    {
+        options.AddOtlpExporter(o => ConfigureCollectorExporter(o, collectorEndpoint));
+    }
 });
 // Enrich logs with Activity context so TraceId/SpanId are present in structured logs
 builder.Services.Configure<LoggerFactoryOptions>(o =>
@@ -34,7 +52,8 @@ builder.Services.AddOpenTelemetry()
         .AddHttpClientInstrumentation()
         .AddEntityFrameworkCoreInstrumentation()
         .AddSource("Npgsql")
-        .AddOtlpExporter()); // Honors OTEL_* env vars
+        .AddOtlpExporter() // Honors OTEL_* env vars (dashboard)
+        .AddOtlpExporter(o => ConfigureCollectorExporter(o, collectorEndpoint)));
 
 // Add services to the container.
 builder.Services.AddOpenApi();
