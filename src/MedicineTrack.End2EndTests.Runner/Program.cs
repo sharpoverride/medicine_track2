@@ -6,9 +6,11 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Trace;
+using OpenTelemetry.Exporter;
 using System.Diagnostics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Metrics;
+using Microsoft.Extensions.Configuration;
 
 namespace MedicineTrack.End2EndTests.Runner;
 
@@ -22,7 +24,23 @@ public class Program
     {
         var options = ParseArgs(args);
 
-        var builder = Host.CreateDefaultBuilder(args)
+        // Collector endpoint is injected by the AppHost as a service reference.
+        var hostBuilder = Host.CreateDefaultBuilder(args);
+        var hostConfiguration = new Microsoft.Extensions.Configuration.ConfigurationBuilder();
+        hostConfiguration.AddEnvironmentVariables();
+        var collectorEndpoint = hostConfiguration.Build()["OTEL_COLLECTOR_OTLP_GRPC"]
+            ?? hostConfiguration.Build()["services:otel-collector:otlp-grpc:0"];
+
+        static void ConfigureCollectorExporter(OtlpExporterOptions options, string? endpoint)
+        {
+            if (!string.IsNullOrEmpty(endpoint) && Uri.TryCreate(endpoint, UriKind.Absolute, out var uri))
+            {
+                options.Endpoint = uri;
+                options.Protocol = OtlpExportProtocol.Grpc;
+            }
+        }
+
+        var builder = hostBuilder
             .ConfigureLogging(logging =>
             {
                 logging.AddOpenTelemetry(options =>
@@ -30,7 +48,11 @@ public class Program
                     options.IncludeScopes = true;
                     options.IncludeFormattedMessage = true;
                     options.ParseStateValues = true;
-                    options.AddOtlpExporter();
+                    options.AddOtlpExporter(); // Dashboard
+                    if (!string.IsNullOrEmpty(collectorEndpoint))
+                    {
+                        options.AddOtlpExporter(o => ConfigureCollectorExporter(o, collectorEndpoint));
+                    }
                 });
             })
             .ConfigureServices((hostContext, services) =>
@@ -61,11 +83,13 @@ public class Program
                         })
                         .AddAspNetCoreInstrumentation()
                         .SetSampler(new AlwaysOnSampler())  // Ensure all traces are sampled
-                        .AddOtlpExporter())
+                        .AddOtlpExporter() // Dashboard
+                        .AddOtlpExporter(o => ConfigureCollectorExporter(o, collectorEndpoint)))
                     .WithMetrics(metrics => metrics
                         .AddHttpClientInstrumentation()
                         .AddRuntimeInstrumentation()
-                        .AddOtlpExporter());
+                        .AddOtlpExporter() // Dashboard
+                        .AddOtlpExporter(o => ConfigureCollectorExporter(o, collectorEndpoint)));
 
                 // Enrich logs with Activity context so TraceId/SpanId are present in structured logs
                 services.Configure<LoggerFactoryOptions>(o =>
